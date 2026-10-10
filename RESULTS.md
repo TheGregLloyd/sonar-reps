@@ -40,3 +40,47 @@ Known limits from this take:
 - There was no ruler, so depth accuracy is unchecked. Pass 9 reads 34.6 cm, more than the intended 20 cm.
 
 Stored as `takes/book_10.flac` (sonar band only, no room speech) with the plot in `takes/book_10.png`. `python simulate.py` replays it as a regression test.
+
+## 10:59. First push-ups over the iPhone: 13 of 13 found, after reworking the tracker
+
+iPhone 16 Pro Max face-up on the floor under the chest, volume about 75%, tone level 0.3 (0.1 per tone). The app saved the take and it was pulled off the phone over the cable.
+
+| Tracker | Cycles found | Counted | Flagged too shallow |
+|---|---|---|---|
+| As tuned on the laptop, 15 cm line | 14 fragments | 1 | 13 |
+| Reworked, 8 cm line | 13 | 13 | 0 |
+
+The trace shows 13 clean, evenly spaced cycles, about 2.3 s apart. The true count still has to be confirmed by Addy.
+
+Why the laptop tracker failed on the phone:
+
+- On the phone the speaker and microphone share one body, so the direct sound is about 200 times stronger than the chest echo (carrier amplitude 0.005, Doppler lines 45 to 50 dB below it).
+- The neighbouring tones, 600 Hz away, leaked through the low-pass at a level above the echo. The two outer tones read a steady 277 and 254 cm/s of motion that was not there, and the trace ran off by 460 cm in 35 s.
+- The circle fit could not find an echo circle that small, so its estimate of the static sound stayed wrong.
+
+What changed:
+
+- Each tone is averaged over one beat of the tone spacing (80 samples), which puts exact nulls on the other tones. Fake motion fell to under 1 cm/s.
+- The static part is removed with a 2 Hz high-pass.
+- The phase step comes from the lag-1 products of all three tones together (pulse-pair, as in Doppler radar), not from a median of three separate phase tracks.
+
+Known limits from this take:
+
+- Depth reads low on the phone: 9.8 to 16.3 cm for full push-ups, roughly half the real travel. The rep line for the phone is therefore 8 cm for now and needs half reps to calibrate.
+- The way up reads shorter than the way down (about 13 cm down, 7 cm up), so the raw trace climbs about 6 cm per rep. The counter copes because it judges each rep on the way down and takes a new top at every rest.
+
+Stored as `takes/phone_pushups_1.flac`.
+
+The book take from 10:39 now reads 11, with depths of 28.6 to 37.0 cm. The extra one is a real movement at 1 to 2 s, before the 10 passes, most likely the book being brought into place.
+
+## 11:10. Second push-ups, louder tones at full volume: unusable
+
+Tone level 0.9 (0.3 per tone) and the phone at full volume, to lift the echo.
+
+| Tone | Level at the start | Lowest | At the end |
+|---|---|---|---|
+| 18.5 kHz | 0.067 | 0.037 | 0.037 |
+| 19.1 kHz | 0.072 | 0.025 | 0.025 |
+| 19.7 kHz | 0.058 | 0.028 | 0.057 |
+
+The carriers came in 9 times stronger, but the speaker output sagged by up to two thirds within 27 s, most likely its heat protection. That drift is far larger than the echo: 0 reps counted, with the 10 push-ups just visible as bumps on a ramp. The tone level is back at 0.3. Do not run the phone at full volume.
