@@ -21,6 +21,8 @@ import Network
 final class SonarEngine: ObservableObject {
     // iPhone speakers roll off sharply above about 20 kHz, so stay below it.
     var tones: [Double] = [18_500, 19_100, 19_700]
+    // Keep this modest. At 0.9 and full volume the speaker output sagged by half
+    // within 30 s, which hides the echo far better than quiet tones do.
     var amplitude: Float = 0.3
     // 256 samples is 1032 bytes with the header, under one Wi-Fi frame.
     private static let samplesPerPacket = 256
@@ -61,6 +63,7 @@ final class SonarEngine: ObservableObject {
         let amp = self.amplitude
         let rampLen = 0.05 * fs
         sampleIndex = 0
+        seq = 0  // tells the Mac a new set has started
 
         let src = AVAudioSourceNode { [unowned self] _, _, frameCount, abl -> OSStatus in
             let buffers = UnsafeMutableAudioBufferListPointer(abl)
