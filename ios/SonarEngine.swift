@@ -4,12 +4,14 @@
 // records the microphone, and streams the raw samples to the Mac over UDP
 // (phone_receiver.py does the tracking). Also saves a WAV of every take.
 //
-// Add to an app target (the PushupTimeDev scheme is fine) and add to Info.plist:
+// Built into the SonarReps app by project.yml (XcodeGen), which also sets the
+// two Info.plist keys this needs:
 //   NSMicrophoneUsageDescription   "Sonar listens for echoes of the tone it plays."
 //   NSLocalNetworkUsageDescription "Streams sonar samples to your Mac."
 //
 // Packet format: 8-byte header (UInt32 sequence, UInt32 flags; bit 0 = phone
 // is moving) followed by Float32 mono samples at 48 kHz, little-endian.
+// Every packet carries samplesPerPacket samples, except the last of a buffer.
 
 import AVFoundation
 import CoreMotion
@@ -20,6 +22,8 @@ final class SonarEngine: ObservableObject {
     // iPhone speakers roll off sharply above about 20 kHz, so stay below it.
     var tones: [Double] = [18_500, 19_100, 19_700]
     var amplitude: Float = 0.3
+    // 256 samples is 1032 bytes with the header, under one Wi-Fi frame.
+    private static let samplesPerPacket = 256
 
     @Published private(set) var running = false
     @Published private(set) var status = "Idle"
@@ -112,11 +116,18 @@ final class SonarEngine: ObservableObject {
                 try? file.write(from: mono)
             }
             if let udp = self.udp {
-                var header = [self.seq.littleEndian, (self.phoneMoving ? UInt32(1) : 0).littleEndian]
-                var data = Data(bytes: &header, count: 8)
-                data.append(UnsafeBufferPointer(start: ch, count: n))
-                udp.send(content: data, completion: .contentProcessed { _ in })
-                self.seq &+= 1
+                // A tap hands over about 0.1 s at a time, far more than one UDP
+                // datagram can carry, so send it in packets that fit one frame.
+                var start = 0
+                while start < n {
+                    let len = min(Self.samplesPerPacket, n - start)
+                    var header = [self.seq.littleEndian, (self.phoneMoving ? UInt32(1) : 0).littleEndian]
+                    var data = Data(bytes: &header, count: 8)
+                    data.append(UnsafeBufferPointer(start: ch + start, count: len))
+                    udp.send(content: data, completion: .contentProcessed { _ in })
+                    self.seq &+= 1
+                    start += len
+                }
             }
         }
 
