@@ -101,3 +101,7 @@ What to hold against these figures:
 ## Prior work
 
 Reuses ideas, not code, from my earlier PressPass project (camera push-up counter): the rep state machine design and the replay evaluation approach.
+
+## Video demonstration 
+
+https://www.youtube.com/watch?v=PdGd_M7TYp4&t=13s
