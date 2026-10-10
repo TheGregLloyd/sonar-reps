@@ -183,7 +183,7 @@ class Rep:
 class RepCounterConfig:
     min_depth_cm: float = 15.0  # a rep must travel at least this far
     start_down_cm: float = 3.0  # movement that opens a rep
-    return_frac: float = 0.35  # must come back within this share of depth
+    return_frac: float = 0.6  # a rep closes once it is back within this share of its depth from the top
     smooth_hz: float = 4.0
     rest_reset_s: float = 0.8  # re-anchor the top after this long still
 
