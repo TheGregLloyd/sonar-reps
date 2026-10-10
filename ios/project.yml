@@ -10,8 +10,10 @@ targets:
     platform: iOS
     sources:
       - SonarRepsApp.swift
-      - SonarView.swift
       - SonarEngine.swift
+      - SonarSession.swift
+      # Every screen lives in UI/. New files there are picked up by xcodegen.
+      - UI
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.adityamitter.sonarreps

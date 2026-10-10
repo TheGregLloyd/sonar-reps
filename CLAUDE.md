@@ -1,5 +1,7 @@
 # Sonar Reps: notes for Claude Code
 
+**Building the iPhone screen on another machine? Read `HANDOFF_UI.md` and follow that. The steps below are for Addy's Mac only.**
+
 Hackathon project for Addy (call him Captain Addy). QMUL AI Hackathon, theme "Invisible AI". **Submission deadline: 4:00pm London time today (Sat 10 Oct 2026). Feature freeze 13:30.** The deliverable is a 3-minute video with a live demo.
 
 ## What this is
@@ -33,7 +35,7 @@ An iPhone counts push-ups by sonar, with no camera: it plays tones at 18.5, 19.1
    - If counts are wrong, tune `RepCounterConfig` (`min_depth_cm`, `start_down_cm`, `return_frac`) and `SonarConfig` fit settings.
    - Add each real recording as a regression test.
 6. **iPhone app**
-   - Create a new SwiftUI iOS app (or use XcodeGen) containing `ios/SonarEngine.swift` and `ios/SonarView.swift`, with `SonarView` as the root view.
+   - The app is built from `ios/project.yml` with XcodeGen. `ios/SonarSession.swift` is the data layer, `ios/UI/SonarView.swift` is the root view.
    - Add to Info.plist: `NSMicrophoneUsageDescription` and `NSLocalNetworkUsageDescription`.
    - Sign with Addy's personal team and run on his iPhone.
    - University Wi-Fi blocks device-to-device UDP, so join the Mac to the iPhone's Personal Hotspot. The Mac's IP is then `ipconfig getifaddr en0`, usually 172.20.10.x.

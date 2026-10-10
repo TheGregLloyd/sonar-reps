@@ -4,12 +4,25 @@
 
 --display also serves the live demo screen on http://localhost:8765.
 
+The verdict goes back to the phone as well, so the app can show it: about 30
+times a second one JSON datagram is sent to the address the audio comes from.
+
+    {"v": 1, "set": 3, "depth": 12.3, "count": 7, "shallow": 1,
+     "moving": false, "lost": 0, "min_depth": 8.0,
+     "rep": {"n": 8, "valid": true, "depth": 21.4, "reason": ""}}
+
+"rep" is the last finished movement of this set (null before the first) and
+"n" its running number, so a lost datagram never loses a rep. "set" goes up
+by one each time the count starts again from zero. An 8 byte packet with
+flag bit 1 set and no samples is the phone asking for that reset.
+
 Network tip: university Wi-Fi often blocks device-to-device traffic. Turn on
 Personal Hotspot on the iPhone and join it from the Mac; the Mac's address
 is then usually 172.20.10.2 (check with: ipconfig getifaddr en0).
 """
 
 import argparse
+import json
 import socket
 import struct
 import sys
@@ -51,10 +64,21 @@ def main():
     lost = 0
     blocked = 0
     last_print = 0.0
+    last_reply = 0.0
+    set_no = 1
     try:
         while True:
-            pkt, _ = sock.recvfrom(65536)
+            pkt, phone = sock.recvfrom(65536)
             seq, flags = struct.unpack("<II", pkt[:8])
+            if len(pkt) == 8:
+                if flags & 2:
+                    # The Reset button in the app: same set of tones, count from zero.
+                    counter = RepCounter(tracker.rate_hz, rep_cfg)
+                    set_no += 1
+                    if display:
+                        display.reset_requested = True
+                        display.take_reset()
+                continue
             x = np.frombuffer(pkt[8:], dtype="<f4").astype(np.float64)
             if expected is not None and seq != expected:
                 gap = (seq - expected) & 0xFFFFFFFF
@@ -71,6 +95,7 @@ def main():
                     # The phone restarted its stream: a new set, from zero.
                     tracker = SonarTracker(cfg)
                     counter = RepCounter(tracker.rate_hz, rep_cfg)
+                    set_no += 1
                     if display:
                         display.reset_requested = True
             expected = (seq + 1) & 0xFFFFFFFF
@@ -79,6 +104,7 @@ def main():
             pos = tracker.process(x)
             if display and display.take_reset():
                 counter = RepCounter(tracker.rate_hz, rep_cfg)
+                set_no += 1
             phone_moving = bool(flags & 1)
             if phone_moving:
                 # Anti-cheat: while the phone itself moves, nothing counts,
@@ -95,6 +121,21 @@ def main():
             if display:
                 display.state(counter, phone_moving, lost)
             now = time.time()
+            if now - last_reply > 1 / 30:
+                last_reply = now
+                last = counter.reps[-1] if counter.reps else None
+                depth = 0.0 if phone_moving or counter.y is None else max(0.0, counter.y - counter.top)
+                reply = {
+                    "v": 1, "set": set_no, "depth": round(float(depth), 2), "count": int(counter.count),
+                    "shallow": int(sum(not r.valid for r in counter.reps)), "moving": phone_moving,
+                    "lost": int(lost), "min_depth": float(a.min_depth),
+                    "rep": None if last is None else {"n": len(counter.reps), "valid": bool(last.valid),
+                                                      "depth": float(last.depth_cm), "reason": last.reason},
+                }
+                try:
+                    sock.sendto(json.dumps(reply).encode(), phone)
+                except OSError:
+                    pass  # the phone left the network; the count carries on
             if now - last_print > 0.05 and len(pos):
                 last_print = now
                 depth = (counter.y - counter.top) if counter.y is not None else 0.0

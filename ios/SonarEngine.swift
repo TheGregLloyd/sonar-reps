@@ -12,6 +12,10 @@
 // Packet format: 8-byte header (UInt32 sequence, UInt32 flags; bit 0 = phone
 // is moving) followed by Float32 mono samples at 48 kHz, little-endian.
 // Every packet carries samplesPerPacket samples, except the last of a buffer.
+// A header alone with flag bit 1 set asks the Mac to count from zero again.
+//
+// The Mac answers on the same socket with its verdict as JSON, about 30 times
+// a second. Those datagrams are handed to onReply (SonarSession decodes them).
 
 import AVFoundation
 import CoreMotion
@@ -39,6 +43,9 @@ final class SonarEngine: ObservableObject {
     private var seq: UInt32 = 0
     private let motion = CMMotionManager()
     private var phoneMoving = false
+
+    /// Called off the main thread with each datagram the Mac sends back.
+    var onReply: ((Data) -> Void)?
 
     func start(macHost: String?, port: UInt16 = 5005, record: Bool = true) throws {
         let session = AVAudioSession.sharedInstance()
@@ -107,6 +114,7 @@ final class SonarEngine: ObservableObject {
                                     port: NWEndpoint.Port(rawValue: port)!, using: .udp)
             conn.start(queue: .global(qos: .userInitiated))
             udp = conn
+            listen(on: conn)
         }
 
         input.installTap(onBus: 0, bufferSize: 1024, format: inFormat) { [weak self] buffer, _ in
@@ -148,6 +156,20 @@ final class SonarEngine: ObservableObject {
         try engine.start()
         running = true
         status = "Sonar on at \(Int(fs)) Hz" + (macHost.map { ", streaming to \($0)" } ?? "")
+    }
+
+    private func listen(on conn: NWConnection) {
+        conn.receiveMessage { [weak self] data, _, _, error in
+            guard let self else { return }
+            if let data, !data.isEmpty { self.onReply?(data) }
+            if error == nil, self.udp === conn { self.listen(on: conn) }
+        }
+    }
+
+    /// Ask the Mac to start the count again from zero.
+    func sendReset() {
+        var header = [seq.littleEndian, UInt32(2).littleEndian]
+        udp?.send(content: Data(bytes: &header, count: 8), completion: .contentProcessed { _ in })
     }
 
     func stop() {
