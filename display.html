@@ -1,0 +1,303 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sonar Reps</title>
+<style>
+  :root {
+    --ink: #020b0e;
+    --deep: #05232b;
+    --phos: #6fffd2;
+    --phos-dim: #2f8f79;
+    --line: rgba(111, 255, 210, 0.13);
+    --text: #d5fff2;
+    --hot: #ff4a36;
+    --amber: #ffb627;
+    --display: "DIN Condensed", "DIN Alternate", "Avenir Next Condensed", "Arial Narrow", sans-serif;
+    --mono: ui-monospace, "SF Mono", Menlo, monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; overflow: hidden; background: var(--ink); color: var(--text); }
+  body {
+    font-family: var(--mono);
+    display: grid;
+    grid-template-rows: auto 1fr 21vh;
+    padding: 2.4vh 2.6vw 2vh;
+    gap: 1.6vh;
+  }
+  /* The sea: rings spreading from where the phone lies, bottom right. */
+  body::before {
+    content: ""; position: fixed; inset: 0; z-index: -2;
+    background:
+      repeating-radial-gradient(circle at 72% 82%, transparent 0 5.4vh, rgba(111, 255, 210, 0.035) 5.4vh 5.6vh),
+      radial-gradient(circle at 72% 82%, #0a3a43 0%, var(--deep) 26%, var(--ink) 68%);
+  }
+  body::after {
+    content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none; opacity: 0.5;
+    background: repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.22) 0 1px, transparent 1px 3px);
+  }
+
+  header { display: flex; justify-content: space-between; align-items: flex-end; }
+  h1 { font-family: var(--display); font-weight: 700; font-size: 5.2vh; letter-spacing: 0.34em; line-height: 0.9; color: var(--phos); text-shadow: 0 0 18px rgba(111, 255, 210, 0.45); }
+  header p { font-size: 1.55vh; letter-spacing: 0.16em; text-transform: uppercase; color: var(--phos-dim); margin-top: 0.9vh; }
+  .status { display: flex; gap: 1.6vw; align-items: center; font-size: 1.5vh; letter-spacing: 0.16em; text-transform: uppercase; color: var(--phos-dim); }
+  .status b { color: var(--text); font-weight: 500; }
+  .pill { padding: 0.6vh 1vw; border: 1px solid var(--phos-dim); border-radius: 99px; color: var(--phos-dim); }
+  .pill::before { content: ""; display: inline-block; width: 0.9vh; height: 0.9vh; border-radius: 50%; margin-right: 0.7vw; background: currentColor; }
+  .live .pill { color: var(--phos); border-color: var(--phos); box-shadow: 0 0 14px rgba(111, 255, 210, 0.25); }
+  .live .pill::before { animation: blink 1.1s steps(2) infinite; }
+  button { font: inherit; letter-spacing: inherit; text-transform: uppercase; color: var(--phos-dim); background: none; border: 1px solid var(--line); border-radius: 4px; padding: 0.6vh 1vw; cursor: pointer; }
+  button:hover { color: var(--phos); border-color: var(--phos); }
+
+  main { display: grid; grid-template-columns: 1.15fr 1fr; gap: 3vw; min-height: 0; }
+
+  /* Left: the count. */
+  .count { position: relative; display: flex; flex-direction: column; justify-content: center; min-height: 0; }
+  .label { font-size: 1.7vh; letter-spacing: 0.5em; color: var(--phos-dim); }
+  #count {
+    font-family: var(--display); font-weight: 700; font-size: min(45vh, 30vw); line-height: 1;
+    margin: 0 0 -0.14em -0.03em; color: var(--phos); font-variant-numeric: tabular-nums;
+    text-shadow: 0 0 10px rgba(111, 255, 210, 0.7), 0 0 70px rgba(111, 255, 210, 0.28);
+    transform-origin: 20% 70%;
+  }
+  #count.thump { animation: thump 0.5s cubic-bezier(0.2, 1.6, 0.3, 1); }
+  .sub { display: flex; gap: 3vw; margin-top: 0.6vh; }
+  .sub div { border-left: 2px solid var(--line); padding-left: 0.9vw; }
+  .sub span { display: block; font-size: 1.35vh; letter-spacing: 0.3em; color: var(--phos-dim); }
+  .sub b { font-family: var(--display); font-size: 5.6vh; font-weight: 700; line-height: 1.05; color: var(--text); }
+  .sub i { font-style: normal; font-size: 1.6vh; color: var(--phos-dim); margin-left: 0.4vw; }
+  .sub .bad b { color: var(--hot); }
+  #chips { list-style: none; display: flex; gap: 0.6vw; margin-top: 1.8vh; height: 3.6vh; }
+  #chips li { font-size: 1.6vh; padding: 0.7vh 0.8vw; border: 1px solid var(--phos-dim); color: var(--phos); border-radius: 3px; animation: rise 0.35s ease-out; }
+  #chips li.bad { border-color: var(--hot); color: var(--hot); text-decoration: line-through; }
+
+  /* Right: the water column. Top is arms straight, the phone lies at the bottom. */
+  .column { position: relative; min-height: 0; border-left: 1px solid var(--line); border-right: 1px solid var(--line); background: linear-gradient(180deg, rgba(111, 255, 210, 0.02), rgba(111, 255, 210, 0.09)); overflow: hidden; }
+  .tick { position: absolute; left: 0; right: 0; height: 1px; background: var(--line); }
+  .tick span { position: absolute; right: 0.8vw; top: -1.9vh; font-size: 1.3vh; color: var(--phos-dim); letter-spacing: 0.1em; }
+  #repline { position: absolute; left: 0; right: 0; height: 0; border-top: 2px dashed var(--amber); opacity: 0.9; }
+  #repline span { position: absolute; left: 0.8vw; top: 0.6vh; font-size: 1.4vh; letter-spacing: 0.28em; color: var(--amber); }
+  #peak { position: absolute; left: 12%; right: 12%; height: 2px; background: var(--text); opacity: 0; transition: opacity 0.3s; }
+  #chest {
+    position: absolute; left: 6%; right: 6%; top: 0; height: 2.2vh; margin-top: -1.1vh; border-radius: 1.1vh;
+    background: linear-gradient(90deg, transparent, var(--phos) 12%, #eafff8 50%, var(--phos) 88%, transparent);
+    box-shadow: 0 0 26px rgba(111, 255, 210, 0.75), 0 0 90px rgba(111, 255, 210, 0.3);
+    will-change: transform;
+  }
+  .deep #chest { background: linear-gradient(90deg, transparent, var(--amber) 12%, #fff3d2 50%, var(--amber) 88%, transparent); box-shadow: 0 0 26px rgba(255, 182, 39, 0.8), 0 0 90px rgba(255, 182, 39, 0.35); }
+  #readout { position: absolute; left: 0; right: 0; top: 2.4vh; text-align: center; font-family: var(--display); font-weight: 700; font-size: 7vh; line-height: 1; color: var(--text); text-shadow: 0 0 16px rgba(2, 11, 14, 0.9); }
+  #readout i { font-style: normal; font-family: var(--mono); font-size: 1.7vh; font-weight: 400; color: var(--phos-dim); margin-left: 0.5vw; letter-spacing: 0.2em; }
+  .phone { position: absolute; left: 50%; bottom: 2.2vh; width: 15vh; height: 1.5vh; margin-left: -7.5vh; border-radius: 0.6vh; background: #0b1417; border: 1px solid var(--phos-dim); }
+  .phone::after { content: "PHONE"; position: absolute; left: 0; right: 0; top: 1.9vh; text-align: center; font-size: 1.1vh; letter-spacing: 0.4em; color: var(--phos-dim); }
+  .ping { position: absolute; left: 50%; bottom: 3vh; width: 10vh; height: 5vh; margin-left: -5vh; border: 2px solid var(--phos); border-bottom: 0; border-radius: 5vh 5vh 0 0; opacity: 0; transform-origin: 50% 100%; }
+  .live .ping { animation: ping 2.1s linear infinite; }
+  .ping:nth-of-type(2) { animation-delay: 0.7s; }
+  .ping:nth-of-type(3) { animation-delay: 1.4s; }
+  .column.hit::before { content: ""; position: absolute; inset: 0; background: rgba(111, 255, 210, 0.22); animation: fade 0.5s ease-out forwards; }
+  #idle { position: absolute; inset: 0; display: grid; place-items: center; font-size: 1.7vh; letter-spacing: 0.4em; color: var(--phos-dim); animation: blink 1.6s steps(2) infinite; }
+  .live #idle { display: none; }
+
+  footer { position: relative; min-height: 0; border-top: 1px solid var(--line); }
+  footer .label { position: absolute; left: 0; top: 1vh; }
+  canvas { width: 100%; height: 100%; display: block; }
+
+  /* Verdicts. */
+  #norep { position: fixed; inset: 0; display: grid; place-items: center; pointer-events: none; opacity: 0; background: radial-gradient(circle, rgba(255, 74, 54, 0.5), rgba(120, 10, 0, 0.82)); }
+  #norep.go { animation: verdict 1.15s ease-out; }
+  #norep div { transform: rotate(-5deg); text-align: center; border: 1.2vh solid #fff; padding: 2vh 5vw 1vh; }
+  #norep strong { display: block; font-family: var(--display); font-size: 30vh; line-height: 0.85; letter-spacing: 0.04em; color: #fff; }
+  #norep span { font-size: 2.6vh; letter-spacing: 0.3em; text-transform: uppercase; color: #fff; }
+  #moved {
+    position: fixed; left: 0; right: 0; top: 0; padding: 2.2vh 0; text-align: center; transform: translateY(-110%); transition: transform 0.18s ease-out;
+    font-family: var(--display); font-weight: 700; font-size: 6vh; letter-spacing: 0.22em; color: #1a1200;
+    background: repeating-linear-gradient(-45deg, var(--amber) 0 3vh, #1a1200 3vh 3.6vh, var(--amber) 3.6vh 6.6vh);
+    text-shadow: 0 0 0.6vh var(--amber), 0 0 1.2vh var(--amber), 0 0 1.8vh var(--amber);
+  }
+  .moving #moved { transform: none; }
+  .moving main, .moving footer { filter: grayscale(1) brightness(0.55); }
+
+  @keyframes blink { 50% { opacity: 0.25; } }
+  @keyframes thump { 0% { transform: scale(1.22); color: #fff; } 100% { transform: scale(1); } }
+  @keyframes rise { from { transform: translateY(1.2vh); opacity: 0; } }
+  @keyframes fade { to { opacity: 0; } }
+  @keyframes ping { 0% { transform: scale(0.3); opacity: 0.7; } 100% { transform: scale(6.5); opacity: 0; } }
+  @keyframes verdict { 0% { opacity: 0; transform: scale(1.12); } 8% { opacity: 1; transform: scale(1); } 70% { opacity: 1; } 100% { opacity: 0; } }
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>SONAR REPS</h1>
+    <p>No camera. Three tones near 19 kHz, echoing off your chest.</p>
+  </div>
+  <div class="status">
+    <span>SOURCE <b id="src">none</b></span>
+    <span>LOST <b id="lost">0</b></span>
+    <span class="pill" id="link">WAITING</span>
+    <button id="reset">Reset</button>
+  </div>
+</header>
+
+<main>
+  <section class="count">
+    <div class="label">REPS</div>
+    <div id="count">0</div>
+    <div class="sub">
+      <div class="bad"><span>NO REPS</span><b id="noreps">0</b></div>
+      <div><span>LAST DEPTH</span><b id="lastdepth">0.0</b><i>CM</i></div>
+    </div>
+    <ol id="chips"></ol>
+  </section>
+
+  <section class="column" id="column">
+    <div id="ticks"></div>
+    <div id="repline"><span id="replabel">REP LINE</span></div>
+    <div id="peak"></div>
+    <div id="chest"></div>
+    <div id="readout"><span id="depth">0.0</span><i>CM DOWN</i></div>
+    <div class="ping"></div><div class="ping"></div><div class="ping"></div>
+    <div class="phone"></div>
+    <div id="idle">WAITING FOR THE SONAR STREAM</div>
+  </section>
+</main>
+
+<footer>
+  <div class="label">CHEST TRACE, LAST 12 S</div>
+  <canvas id="trace"></canvas>
+</footer>
+
+<div id="norep"><div><strong>NO REP</strong><span id="why">too shallow</span></div></div>
+<div id="moved">PHONE MOVED, NOT COUNTING</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const MAX_CM = 40, WINDOW_S = 12;
+const S = { depth: 0, shown: 0, count: 0, shallow: 0, moving: false, lost: 0, min: 15, peak: 0, lastMsg: -1e9 };
+const hist = [], marks = [];
+
+function retrigger(el, cls) { el.classList.remove(cls); void el.offsetWidth; el.classList.add(cls); }
+
+function layout() {
+  const col = $("column"), h = col.clientHeight, usable = h * 0.80, top = h * 0.03;
+  S.y = cm => top + Math.min(cm, MAX_CM) / MAX_CM * usable;
+  let html = "";
+  for (let cm = 0; cm <= MAX_CM; cm += 5)
+    html += `<div class="tick" style="top:${S.y(cm)}px">${cm % 10 === 0 ? `<span>${cm}</span>` : ""}</div>`;
+  $("ticks").innerHTML = html;
+  $("repline").style.top = S.y(S.min) + "px";
+  $("replabel").textContent = `REP LINE ${S.min.toFixed(0)} CM`;
+  const c = $("trace"), r = window.devicePixelRatio || 1;
+  c.width = c.clientWidth * r; c.height = c.clientHeight * r;
+}
+
+function onState(m) {
+  S.depth = m.depth; S.moving = m.moving; S.lost = m.lost; S.lastMsg = performance.now();
+  if (m.count !== S.count) { S.count = m.count; $("count").textContent = m.count; }
+  if (m.shallow !== S.shallow) { S.shallow = m.shallow; $("noreps").textContent = m.shallow; }
+  $("lost").textContent = m.lost;
+  document.body.classList.toggle("moving", m.moving);
+}
+
+function onRep(r) {
+  marks.push({ t: performance.now(), valid: r.valid, depth: r.depth });
+  $("lastdepth").textContent = r.depth.toFixed(1);
+  const li = document.createElement("li");
+  li.textContent = r.depth.toFixed(0) + " cm";
+  if (!r.valid) li.className = "bad";
+  const chips = $("chips");
+  chips.appendChild(li);
+  while (chips.children.length > 9) chips.removeChild(chips.firstChild);
+  if (r.valid) {
+    S.count = r.count; $("count").textContent = r.count;
+    retrigger($("count"), "thump"); retrigger($("column"), "hit");
+  } else {
+    $("why").textContent = `too shallow: ${r.depth.toFixed(1)} cm of ${S.min.toFixed(0)}`;
+    retrigger($("norep"), "go");
+  }
+}
+
+function onReset() {
+  S.count = S.shallow = 0; marks.length = 0;
+  $("count").textContent = "0"; $("noreps").textContent = "0"; $("lastdepth").textContent = "0.0"; $("chips").innerHTML = "";
+}
+
+function drawTrace(now) {
+  const c = $("trace"), g = c.getContext("2d"), w = c.width, h = c.height, r = window.devicePixelRatio || 1;
+  const x = t => w - (now - t) / (WINDOW_S * 1000) * w;
+  const y = cm => h * 0.16 + Math.min(cm, MAX_CM) / MAX_CM * h * 0.78;
+  g.clearRect(0, 0, w, h);
+  g.setLineDash([8 * r, 8 * r]); g.strokeStyle = "rgba(255,182,39,0.7)"; g.lineWidth = 1.5 * r;
+  g.beginPath(); g.moveTo(0, y(S.min)); g.lineTo(w, y(S.min)); g.stroke(); g.setLineDash([]);
+  if (hist.length > 1) {
+    g.beginPath();
+    hist.forEach((p, i) => i ? g.lineTo(x(p.t), y(p.d)) : g.moveTo(x(p.t), y(p.d)));
+    g.strokeStyle = "#6fffd2"; g.lineWidth = 2.5 * r; g.shadowColor = "#6fffd2"; g.shadowBlur = 14 * r; g.lineJoin = "round";
+    g.stroke(); g.shadowBlur = 0;
+    g.lineTo(w, y(0)); g.lineTo(x(hist[0].t), y(0)); g.closePath();
+    const fill = g.createLinearGradient(0, y(0), 0, h);
+    fill.addColorStop(0, "rgba(111,255,210,0)"); fill.addColorStop(1, "rgba(111,255,210,0.22)");
+    g.fillStyle = fill; g.fill();
+  }
+  g.font = `${12 * r}px ui-monospace, Menlo, monospace`; g.textAlign = "center";
+  for (const m of marks) {
+    const mx = x(m.t);
+    g.fillStyle = m.valid ? "#6fffd2" : "#ff4a36";
+    g.fillRect(mx - r, h * 0.06, 2 * r, h * 0.1);
+    g.fillText(m.valid ? "REP" : "NO REP", mx, h * 0.05 + 2 * r);
+  }
+}
+
+function frame(now) {
+  const live = now - S.lastMsg < 1500;
+  document.body.classList.toggle("live", live);
+  $("link").textContent = live ? "LIVE" : "WAITING";
+  if (!live) S.depth = 0;
+  S.shown += (S.depth - S.shown) * 0.3;
+  const d = Math.max(0, S.shown);
+  $("chest").style.transform = `translateY(${S.y(d)}px)`;
+  $("depth").textContent = d.toFixed(1);
+  $("column").classList.toggle("deep", d >= S.min);
+  // Hold a mark at the lowest point of the current rep.
+  if (d < 1.5) S.peak = 0; else S.peak = Math.max(S.peak, d);
+  $("peak").style.top = S.y(S.peak) + "px";
+  $("peak").style.opacity = S.peak > 3 ? 0.55 : 0;
+  hist.push({ t: now, d });
+  while (hist.length && now - hist[0].t > WINDOW_S * 1000) hist.shift();
+  while (marks.length && now - marks[0].t > WINDOW_S * 1000) marks.shift();
+  drawTrace(now);
+  requestAnimationFrame(frame);
+}
+
+function connect() {
+  const es = new EventSource("/events");
+  es.addEventListener("hello", e => { const m = JSON.parse(e.data); S.min = m.min_depth; $("src").textContent = m.source; layout(); });
+  es.addEventListener("state", e => onState(JSON.parse(e.data)));
+  es.addEventListener("rep", e => onRep(JSON.parse(e.data)));
+  es.addEventListener("reset", onReset);
+}
+
+// ?demo plays a scripted set with no server, to check the screen itself.
+function demo() {
+  $("src").textContent = "demo";
+  const reps = [[1, 26], [3.2, 24], [5.4, 27], [7.6, 9], [9.8, 25], [15, 23]];
+  let count = 0, shallow = 0; const done = new Set(); const t0 = performance.now();
+  setInterval(() => {
+    const t = ((performance.now() - t0) / 1000) % 18; let depth = 0;
+    if (t < 0.1) { done.clear(); count = shallow = 0; onReset(); }
+    reps.forEach(([s, dep], i) => {
+      if (t >= s && t < s + 1.8) depth = dep * 0.5 * (1 - Math.cos(2 * Math.PI * (t - s) / 1.8));
+      if (t >= s + 1.5 && !done.has(i)) { done.add(i); const valid = dep >= S.min; valid ? count++ : shallow++; onRep({ valid, depth: dep, count }); }
+    });
+    onState({ depth, count, shallow, moving: t > 12 && t < 14.2, lost: 0 });
+  }, 33);
+}
+
+$("reset").onclick = () => fetch("/reset", { method: "POST" });
+window.addEventListener("resize", layout);
+layout();
+location.search.includes("demo") ? demo() : connect();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>

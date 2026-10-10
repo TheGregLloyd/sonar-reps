@@ -24,6 +24,7 @@ import time
 import numpy as np
 import sounddevice as sd
 
+from live_display import Display
 from sonar_core import RepCounter, RepCounterConfig, SonarConfig, SonarTracker, tone_block
 
 
@@ -50,7 +51,8 @@ def check(cfg: SonarConfig, amp: float, seconds: float = 3.0):
     print("Hardware can do it." if ok else "Some tones are weak: raise volume or drop those tones.")
 
 
-def live(cfg: SonarConfig, amp: float, record: str, min_depth: float, seconds: float = 0.0):
+def live(cfg: SonarConfig, amp: float, record: str, min_depth: float, seconds: float = 0.0,
+         display_port: int = 0):
     q: "queue.Queue[np.ndarray]" = queue.Queue()
     n_out = [0]
     ramp_len = int(0.05 * cfg.fs)
@@ -68,6 +70,10 @@ def live(cfg: SonarConfig, amp: float, record: str, min_depth: float, seconds: f
 
     tracker = SonarTracker(cfg)
     counter = RepCounter(tracker.rate_hz, RepCounterConfig(min_depth_cm=min_depth))
+    display = None
+    if display_port:
+        display = Display(min_depth, "Mac", port=display_port)
+        display.start()
     writer = None
     if record:
         import soundfile as sf
@@ -83,9 +89,15 @@ def live(cfg: SonarConfig, amp: float, record: str, min_depth: float, seconds: f
                 if writer:
                     writer.write(x)
                 pos = tracker.process(x.astype(np.float64))
+                if display and display.take_reset():
+                    counter = RepCounter(tracker.rate_hz, RepCounterConfig(min_depth_cm=min_depth))
                 for r in counter.process(pos):
                     mark = "REP" if r.valid else "NO REP (too shallow)"
                     print(f"\n  {mark}  depth {r.depth_cm:.1f} cm   total {counter.count}")
+                    if display:
+                        display.rep(r, counter.count)
+                if display:
+                    display.state(counter)
                 now = time.time()
                 if now - last_print > 0.1 and len(pos):
                     last_print = now
@@ -112,9 +124,11 @@ if __name__ == "__main__":
     ap.add_argument("--min-depth", type=float, default=15.0)
     ap.add_argument("--seconds", type=float, default=0.0, help="stop after this long (0 = until Ctrl+C)")
     ap.add_argument("--tones", default="18500,19100,19700")
+    ap.add_argument("--display", type=int, nargs="?", const=8000, default=0, metavar="PORT",
+                    help="serve the live demo screen (default port 8000)")
     a = ap.parse_args()
     cfg = SonarConfig(tones_hz=tuple(float(f) for f in a.tones.split(",")))
     if a.check:
         check(cfg, a.amp)
     else:
-        live(cfg, a.amp, a.record, a.min_depth, a.seconds)
+        live(cfg, a.amp, a.record, a.min_depth, a.seconds, a.display)

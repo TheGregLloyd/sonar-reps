@@ -1,6 +1,8 @@
 """Receive the iPhone's sonar stream on the Mac and count reps live.
 
-  python phone_receiver.py [--port 5005] [--min-depth 15] [--record take.wav]
+  python phone_receiver.py [--port 5005] [--min-depth 15] [--record take.wav] [--display]
+
+--display also serves the live demo screen on http://localhost:8000.
 
 Network tip: university Wi-Fi often blocks device-to-device traffic. Turn on
 Personal Hotspot on the iPhone and join it from the Mac; the Mac's address
@@ -15,6 +17,7 @@ import time
 
 import numpy as np
 
+from live_display import Display
 from sonar_core import RepCounter, RepCounterConfig, SonarConfig, SonarTracker
 
 
@@ -24,11 +27,18 @@ def main():
     ap.add_argument("--min-depth", type=float, default=15.0)
     ap.add_argument("--tones", default="18500,19100,19700")
     ap.add_argument("--record", default="")
+    ap.add_argument("--display", type=int, nargs="?", const=8000, default=0, metavar="PORT",
+                    help="serve the live demo screen (default port 8000)")
     a = ap.parse_args()
 
     cfg = SonarConfig(tones_hz=tuple(float(f) for f in a.tones.split(",")))
     tracker = SonarTracker(cfg)
-    counter = RepCounter(tracker.rate_hz, RepCounterConfig(min_depth_cm=a.min_depth))
+    rep_cfg = RepCounterConfig(min_depth_cm=a.min_depth)
+    counter = RepCounter(tracker.rate_hz, rep_cfg)
+    display = None
+    if a.display:
+        display = Display(a.min_depth, "iPhone", port=a.display)
+        display.start()
     writer = None
     if a.record:
         import soundfile as sf
@@ -58,22 +68,32 @@ def main():
                     if writer:
                         writer.write(np.zeros(skipped, dtype=np.float32))
                 else:
-                    # The phone restarted its stream: lock on again from scratch.
+                    # The phone restarted its stream: a new set, from zero.
                     tracker = SonarTracker(cfg)
+                    counter = RepCounter(tracker.rate_hz, rep_cfg)
+                    if display:
+                        display.reset_requested = True
             expected = (seq + 1) & 0xFFFFFFFF
             if writer:
                 writer.write(x.astype(np.float32))
             pos = tracker.process(x)
+            if display and display.take_reset():
+                counter = RepCounter(tracker.rate_hz, rep_cfg)
             phone_moving = bool(flags & 1)
             if phone_moving:
-                # Anti-cheat: while the phone itself moves, nothing counts.
+                # Anti-cheat: while the phone itself moves, nothing counts,
+                # and the counter starts again from wherever the chest is.
                 blocked += 1
                 counter.state = "up"
-                counter.top = counter.y if counter.y is not None else 0.0
-                continue
-            for r in counter.process(pos):
-                mark = "REP" if r.valid else "NO REP (too shallow)"
-                print(f"\n  {mark}  depth {r.depth_cm:.1f} cm   total {counter.count}")
+                counter.y = None
+            else:
+                for r in counter.process(pos):
+                    mark = "REP" if r.valid else "NO REP (too shallow)"
+                    print(f"\n  {mark}  depth {r.depth_cm:.1f} cm   total {counter.count}")
+                    if display:
+                        display.rep(r, counter.count)
+            if display:
+                display.state(counter, phone_moving, lost)
             now = time.time()
             if now - last_print > 0.05 and len(pos):
                 last_print = now
