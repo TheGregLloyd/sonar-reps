@@ -84,3 +84,17 @@ Tone level 0.9 (0.3 per tone) and the phone at full volume, to lift the echo.
 | 19.7 kHz | 0.058 | 0.028 | 0.057 |
 
 The carriers came in 9 times stronger, but the speaker output sagged by up to two thirds within 27 s, most likely its heat protection. That drift is far larger than the echo: 0 reps counted, with the 10 push-ups just visible as bumps on a ramp. The tone level is back at 0.3. Do not run the phone at full volume.
+
+## 11:22. Third push-ups over the iPhone, 10 confirmed reps: 10 of 10
+
+Tone level back at 0.3, phone plugged in and face-up on the floor, carriers steady at 0.003 for the whole take. Addy counted 10 reps.
+
+| True reps | Counted | Flagged too shallow | Depths |
+|---|---|---|---|
+| 10 | 10 | 1 | 20.6 to 24.9 cm |
+
+The one NO REP is a 6 cm movement at 1.4 s, Addy getting into position, so rejecting it is correct. The count is the same at the 8 cm line and at the 15 cm line.
+
+These reps were slower (about 4 s apart) and read about twice as deep as the 13 quick ones at 10:59. Whether those were really shallower or the reading depends on speed or placement is not known yet.
+
+Stored as `takes/phone_pushups_3.flac`.

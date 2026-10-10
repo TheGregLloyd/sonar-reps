@@ -28,5 +28,20 @@
     "note": "iPhone 16 Pro Max face-up on the floor, volume about 75 percent, tone level 0.3. Rep count read from the trace (13 clean cycles), to be confirmed by Addy. Depth reads low on the phone, so the line is 8 cm.",
     "expect_valid": 13,
     "expect_shallow": 0
+  },
+  {
+    "name": "phone_pushups_3",
+    "file": "phone_pushups_3.flac",
+    "kind": "push-ups over iPhone",
+    "true_reps": 10,
+    "min_depth_cm": 8.0,
+    "tones_hz": [
+      18500.0,
+      19100.0,
+      19700.0
+    ],
+    "note": "iPhone 16 Pro Max face-up on the floor, plugged in, tone level 0.3, carriers at 0.003. 10 reps confirmed by Addy. The one NO REP is him getting into position at 1.4 s.",
+    "expect_valid": 10,
+    "expect_shallow": 1
   }
 ]
