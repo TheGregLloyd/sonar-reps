@@ -38,11 +38,11 @@ class Display:
                 except queue.Full:
                     pass  # a stalled browser tab must never block the audio loop
 
-    def state(self, counter, moving: bool = False, lost: int = 0):
+    def state(self, counter, moving: bool = False, lost: int = 0, quiet: bool = False):
         """Call after every block. Sends at most rate_hz updates a second."""
         # Depth below the counter's own top. It snaps back to zero when a rep
         # closes, which reads on the gauge as the rep finishing.
-        depth = 0.0 if moving or counter.y is None else max(0.0, counter.y - counter.top)
+        depth = 0.0 if moving or quiet or counter.y is None else max(0.0, counter.y - counter.top)
         now = time.time()
         if now - self.last_sent < self.period:
             return
@@ -53,6 +53,7 @@ class Display:
             "shallow": int(sum(not r.valid for r in counter.reps)),
             "moving": bool(moving),
             "lost": int(lost),
+            "quiet": bool(quiet),
         })
 
     def rep(self, rep, count: int):

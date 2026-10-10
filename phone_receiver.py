@@ -10,13 +10,15 @@ The verdict goes back to the phone as well, so the app can show it: about 30
 times a second one JSON datagram is sent to the address the audio comes from.
 
     {"v": 1, "set": 3, "depth": 12.3, "count": 7, "shallow": 1,
-     "moving": false, "lost": 0, "min_depth": 8.0,
+     "moving": false, "quiet": false, "lost": 0, "min_depth": 8.0,
      "rep": {"n": 8, "valid": true, "depth": 21.4, "reason": ""}}
 
 "rep" is the last finished movement of this set (null before the first) and
 "n" its running number, so a lost datagram never loses a rep. "set" goes up
 by one each time the count starts again from zero. An 8 byte packet with
-flag bit 1 set and no samples is the phone asking for that reset.
+flag bit 1 set and no samples is the phone asking for that reset. "quiet"
+means the tones reach the microphone too weakly to count (phone volume
+turned down), so nothing counts until they come back.
 
 Network tip: university Wi-Fi often blocks device-to-device traffic. Turn on
 Personal Hotspot on the iPhone and join it from the Mac; the Mac's address
@@ -35,6 +37,11 @@ import numpy as np
 from judge import REASONS, Judge, MovementFinder
 from live_display import Display
 from sonar_core import RepCounter, RepCounterConfig, SonarConfig, SonarTracker
+
+# Weakest tone level at the phone's microphone that still gives a usable
+# echo. Good sets measured 0.0017 to 0.0031; the set recorded with the volume
+# turned down measured 0.0002 and read as noise (RESULTS.md, 13:04).
+QUIET_LEVEL = 0.0008
 
 
 def main():
@@ -82,6 +89,7 @@ def main():
     last_print = 0.0
     last_reply = 0.0
     set_no = 1
+    was_quiet = False
     try:
         while True:
             pkt, phone = sock.recvfrom(65536)
@@ -122,10 +130,16 @@ def main():
                 finder, counter = fresh()
                 set_no += 1
             phone_moving = bool(flags & 1)
-            if phone_moving:
+            quiet = tracker.heard_s > 1.0 and tracker.level < QUIET_LEVEL
+            if quiet != was_quiet:
+                was_quiet = quiet
+                print(f"\n  TONE TOO QUIET (level {tracker.level:.4f}, need {QUIET_LEVEL}): turn the phone volume up"
+                      if quiet else f"\n  tone level back to {tracker.level:.4f}, counting again")
+            if phone_moving or quiet:
                 # Anti-cheat: while the phone itself moves, nothing counts,
                 # and the counter starts again from wherever the chest is.
-                blocked += 1
+                # The same holds while the tones are too quiet to trust.
+                blocked += phone_moving
                 counter.state = "up"
                 counter.y = None
             else:
@@ -143,16 +157,16 @@ def main():
                     if display:
                         display.rep(r, counter.count)
             if display:
-                display.state(counter, phone_moving, lost)
+                display.state(counter, phone_moving, lost, quiet)
             now = time.time()
             if now - last_reply > 1 / 30:
                 last_reply = now
                 last = counter.reps[-1] if counter.reps else None
-                depth = 0.0 if phone_moving or counter.y is None else max(0.0, counter.y - counter.top)
+                depth = 0.0 if phone_moving or quiet or counter.y is None else max(0.0, counter.y - counter.top)
                 reply = {
                     "v": 1, "set": set_no, "depth": round(float(depth), 2), "count": int(counter.count),
                     "shallow": int(sum(not r.valid for r in counter.reps)), "moving": phone_moving,
-                    "lost": int(lost), "min_depth": float(line_cm),
+                    "quiet": bool(quiet), "lost": int(lost), "min_depth": float(line_cm),
                     "rep": None if last is None else {"n": len(counter.reps), "valid": bool(last.valid),
                                                       "depth": float(last.depth_cm), "reason": last.reason},
                 }

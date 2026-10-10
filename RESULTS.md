@@ -124,3 +124,26 @@ Stored as `takes/phone_live_4.flac`. The band-limited copy reads rep 9 as 15.7 c
 ## 11:34. A 5 second clip: not a set
 
 Two quick movements, 0.5 s and 0.9 s long, read as reps of 15.1 and 19.0 cm. Too short to be a push-up set, and what was done is not known, so it is not stored as a take. If this was a hand waved over the phone, it shows that a hand can pass as a rep today.
+
+## 11:49. Live session of 146.6 s: not labelled
+
+`recordings/live2.wav`, streamed to the Mac with the 8 cm line: 22 counted, 7 refused, 9 packets lost (48 ms of sound), 361 blocks ignored while the phone was moved. What was done in it was not written down, so it is not stored as a take. Tone level at the microphone was normal (0.0017 to 0.0021).
+
+## 13:04. 10 normal push-ups with the phone volume turned down: 0 of 10 counted
+
+`recordings/sonar-2026-10-10T12-04-30Z.wav`, 31.2 s, saved on the phone. The Mac had dropped off the hotspot onto the university Wi-Fi, so nothing was streamed and the phone showed no count.
+
+**Failed, and the cause is measured.** The tones reach the microphone 10 times weaker than in every good set:
+
+| Take | 18.5 kHz | 19.1 kHz | 19.7 kHz | Result |
+|---|---|---|---|---|
+| 11:22 (10 of 10) | 0.0028 | 0.0031 | 0.0027 | clean cycles, 20.6 to 24.9 cm |
+| 11:25 (10 of 10) | 0.0020 | 0.0023 | 0.0019 | clean cycles, 9.3 to 17.5 cm |
+| 11:49 session | 0.0020 | 0.0021 | 0.0017 | counted |
+| 13:04 (this one) | 0.0002 | 0.0002 | 0.0002 | no cycles, 4 movements of 3.7 to 5.9 cm, 0 counted |
+
+Levels are the tone amplitude in the recording, full scale 1.0. The app's audio code is the same as at 11:25, so the phone volume was almost certainly well below the usual 75 percent. With the echo 20 dB down the trace is noise: no push-up can be picked out of it by eye either.
+
+Not stored as a take: the 10 reps are not recoverable from it.
+
+Fix made straight away: the tracker now reports the weakest tone level (`SonarTracker.level`), and `phone_receiver.py` refuses to count and shows "TONE TOO QUIET, TURN THE PHONE VOLUME UP" on the demo screen while it is under 0.0008. Checked by replay: this take is blocked from its first second (level 0.0001 to 0.0002), and the 11:22 take still counts 10 of 10 with no warning. The warning needs the stream to reach the Mac; a set recorded on the phone alone is not checked.

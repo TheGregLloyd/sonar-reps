@@ -197,7 +197,9 @@ function onState(m) {
   if (m.count !== S.count) { S.count = m.count; $("count").textContent = m.count; }
   if (m.shallow !== S.shallow) { S.shallow = m.shallow; $("noreps").textContent = m.shallow; }
   $("lost").textContent = m.lost;
-  document.body.classList.toggle("moving", m.moving);
+  // One banner for both reasons nothing counts: the phone moved, or its tones are too quiet to echo.
+  $("moved").textContent = m.quiet ? "TONE TOO QUIET, TURN THE PHONE VOLUME UP" : "PHONE MOVED, NOT COUNTING";
+  document.body.classList.toggle("moving", m.moving || !!m.quiet);
 }
 
 function onRep(r) {

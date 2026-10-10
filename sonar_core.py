@@ -63,6 +63,7 @@ class ToneTracker:
         self.za_i = np.zeros(n_avg - 1)
         self.za_q = np.zeros(n_avg - 1)
         self.n = 0  # global sample index
+        self.level = 0.0  # tone amplitude at the microphone in the last block (direct sound)
         # Static removal. Second order, so a steady drift of the direct
         # sound (a phone speaker warming up) is removed as well as its level.
         self.hp = butter(2, cfg.static_hz, btype="highpass", fs=cfg.fs / cfg.decim, output="sos")
@@ -84,6 +85,7 @@ class ToneTracker:
         z = (i[keep] + 1j * q[keep]) * 2.0
         if len(z) == 0:
             return z
+        self.level = float(np.abs(z.mean()))
         if self.zs is None:
             self.zs = sosfilt_zi(self.hp) * z[0]  # as if the signal had always been here
         d, self.zs = sosfilt(self.hp, z, zi=self.zs)
@@ -107,6 +109,10 @@ class SonarTracker:
         # turns (near 1 for one clean reflector, near 0 for noise).
         self.power = np.zeros(0)
         self.steadiness = np.zeros(0)
+        # Weakest tone at the microphone, smoothed over about a second. If
+        # the phone volume is turned down this falls and the echo is lost.
+        self.level = 0.0
+        self.heard_s = 0.0
         # Phase to reflector movement. The tones are within 3 % of each other,
         # so one wavelength serves for the sum.
         self.scale = SPEED_OF_SOUND / float(np.mean(cfg.tones_hz)) / (4.0 * np.pi)
@@ -121,6 +127,10 @@ class SonarTracker:
         d = np.vstack([t.process(x) for t in self.trackers])
         if d.shape[1] == 0:
             return np.zeros(0)
+        weakest = min(t.level for t in self.trackers)
+        block_s = len(x) / self.cfg.fs
+        self.level = weakest if self.heard_s == 0.0 else self.level + min(1.0, block_s) * (weakest - self.level)
+        self.heard_s += block_s
         # Lag-1 products: each one turns by the phase the echo gained in one
         # sample. Phase rises as the echo path shortens, and the path changes
         # by twice the reflector's movement.
