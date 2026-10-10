@@ -36,6 +36,7 @@ python probe_live.py --check             # can this laptop do 19 kHz?
 python probe_live.py                     # live tracking on the laptop
 python phone_receiver.py                 # live tracking from the iPhone
 python analyze_wav.py take.wav --plot take.png
+python takes.py                          # replay the real recordings in takes/
 ```
 
 iPhone: add `ios/SonarEngine.swift` and `ios/SonarView.swift` to an app target, add `NSMicrophoneUsageDescription` and `NSLocalNetworkUsageDescription` to Info.plist, run, type the Mac's IP and press Start. If the university Wi-Fi blocks the stream, turn on the iPhone's Personal Hotspot and join it from the Mac.
@@ -43,7 +44,8 @@ iPhone: add `ios/SonarEngine.swift` and `ios/SonarView.swift` to an app target, 
 ## Status
 
 - Synthetic tests pass: steady, fast (0.7 s) and noisy sets, a shallow rep flagged as no rep, an empty floor counting zero.
-- Not yet tested on real hardware. Depth reads about 10% low on synthetic data.
+- Laptop test on real hardware: all 10 passes of a book over a MacBook Air were detected. See `RESULTS.md`.
+- Not yet tested on an iPhone. Depth reads about 10% low on synthetic data.
 
 ## Prior work
 
