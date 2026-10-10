@@ -9,16 +9,15 @@ struct NoRepOverlay: View {
 
     var body: some View {
         ZStack {
-            Theme.noRep.ignoresSafeArea()
+            Theme.noRepFill.ignoresSafeArea()
             VStack(spacing: 14) {
                 Text("NO REP")
                     .font(Theme.display(150))
                     .minimumScaleFactor(0.5)
                     .lineLimit(1)
                     .foregroundStyle(.white)
-                Text(detail.uppercased())
-                    .font(.system(size: 16, weight: .semibold))
-                    .tracking(1.6)
+                Text(detail)
+                    .font(.system(size: 18, weight: .medium))
                     .foregroundStyle(.white.opacity(0.9))
                     .multilineTextAlignment(.center)
             }
@@ -33,16 +32,15 @@ struct PhoneMovedBanner: View {
         HStack(spacing: 10) {
             Image(systemName: "exclamationmark.triangle.fill")
                 .font(.system(size: 18, weight: .bold))
-            Text("PHONE MOVED, NOT COUNTING")
-                .font(Theme.display(26))
-                .tracking(1.2)
+            Text("Phone moved. Keep it still.")
+                .font(.system(size: 19, weight: .semibold))
                 .lineLimit(1)
                 .minimumScaleFactor(0.6)
         }
-        .foregroundStyle(Color.black)
+        .foregroundStyle(Theme.warnInk)
         .padding(.vertical, 16)
         .frame(maxWidth: .infinity)
-        .background(RoundedRectangle(cornerRadius: 14).fill(Theme.warn))
+        .background(RoundedRectangle(cornerRadius: 14).fill(Theme.warnFill))
         .padding(.horizontal, 16)
         .allowsHitTesting(false)
     }

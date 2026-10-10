@@ -8,46 +8,48 @@ struct HowItWorks: View {
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 28) {
-            HStack(spacing: 12) {
-                LogoMark().frame(width: 34, height: 34)
-                Text("SONAR REPS")
-                    .font(Theme.display(26))
-                    .tracking(3)
-                    .foregroundStyle(Theme.text)
-            }
-            .padding(.top, 8)
+        ScrollView {
+            VStack(alignment: .leading, spacing: 28) {
+                HStack(spacing: 12) {
+                    LogoMark().frame(width: 34, height: 34).accessibilityHidden(true)
+                    Text("SONAR REPS")
+                        .font(Theme.display(26))
+                        .tracking(3)
+                        .foregroundStyle(Theme.text)
+                }
+                .padding(.top, 8)
 
-            Step(number: 1, title: "Phone on the floor",
-                 text: "Face-up, under your chest. Volume at about three quarters.") {
-                PlacementSketch()
+                Step(number: 1, title: "Phone on the floor",
+                     text: "Face-up, under your chest. Volume at about three quarters.") {
+                    PlacementSketch()
+                }
+                Step(number: 2, title: "Start, then hands off",
+                     text: "Moving the phone pauses counting. Full reps count; shallow ones show NO REP.") {
+                    CountSketch()
+                }
+                Step(number: 3, title: "Sound you cannot hear",
+                     text: "Three tones near 19 kHz echo off your chest. No camera, nothing to wear.") {
+                    LogoMark().padding(6)
+                }
             }
-            Step(number: 2, title: "Start, then hands off",
-                 text: "Moving the phone pauses counting. Full reps count; shallow ones show NO REP.") {
-                CountSketch()
-            }
-            Step(number: 3, title: "Sound you cannot hear",
-                 text: "Three tones near 19 kHz echo off your chest. No camera, nothing to wear.") {
-                LogoMark().padding(6)
-            }
-
-            Spacer(minLength: 0)
-
+            .padding(24)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .safeAreaInset(edge: .bottom) {
             Button { dismiss() } label: {
-                Text("GOT IT")
-                    .font(Theme.display(22))
-                    .tracking(2)
-                    .foregroundStyle(Color.black)
+                Text("Got it")
+                    .font(.headline)
+                    .foregroundStyle(Theme.onAccent)
                     .frame(maxWidth: .infinity)
                     .frame(height: 54)
                     .background(RoundedRectangle(cornerRadius: 14).fill(Theme.accent))
             }
             .buttonStyle(.plain)
+            .padding(.horizontal, 24)
+            .padding(.bottom, 12)
         }
-        .padding(24)
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background(Theme.bg.ignoresSafeArea())
-        .preferredColorScheme(.dark)
+        .sonarAppearance()
     }
 }
 
@@ -61,14 +63,16 @@ private struct Step<Art: View>: View {
         HStack(alignment: .top, spacing: 16) {
             art()
                 .frame(width: 76, height: 76)
+                .accessibilityHidden(true)
                 .background(RoundedRectangle(cornerRadius: 16).fill(Theme.surface))
+                .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(Theme.hairline, lineWidth: 1))
             VStack(alignment: .leading, spacing: 6) {
-                Caption("Step \(number)", color: Theme.accent, size: 10)
+                Caption("Step \(number)", color: Theme.accent, size: 12)
                 Text(title)
-                    .font(.system(size: 17, weight: .semibold))
+                    .font(.headline)
                     .foregroundStyle(Theme.text)
                 Text(text)
-                    .font(.system(size: 14))
+                    .font(.subheadline)
                     .foregroundStyle(Theme.muted)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -119,7 +123,6 @@ private struct CountSketch: View {
                 .foregroundStyle(Theme.text)
             Text("NO REP")
                 .font(.system(size: 8, weight: .bold))
-                .tracking(1)
                 .foregroundStyle(.white)
                 .padding(.horizontal, 5)
                 .padding(.vertical, 2)

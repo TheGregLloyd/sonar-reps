@@ -18,7 +18,7 @@ struct RepHistory: View {
             let barArea = geo.size.height - 16
             ZStack(alignment: .bottomLeading) {
                 if recent.isEmpty {
-                    Caption("Reps appear here", color: Theme.faint, size: 10)
+                    Caption("Reps appear here", color: Theme.faint, size: 12)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
                 }
 
@@ -39,10 +39,15 @@ struct RepHistory: View {
                                 .frame(height: max(3, CGFloat(min(rep.depthCm, scale) / scale) * barArea))
                             Text("\(Int(rep.depthCm.rounded()))")
                                 .font(.system(size: 10, weight: .semibold).monospacedDigit())
+                                .strikethrough(!rep.valid)
                                 .foregroundStyle(rep.valid ? Theme.muted : Theme.noRep)
                                 .frame(height: 12)
                         }
                         .frame(maxWidth: 26)
+                        .accessibilityElement()
+                        .accessibilityLabel(rep.valid
+                            ? "Rep, \(Int(rep.depthCm.rounded())) centimetres"
+                            : "No rep, \(Int(rep.depthCm.rounded())) centimetres")
                         .transition(.move(edge: .bottom).combined(with: .opacity))
                     }
                 }

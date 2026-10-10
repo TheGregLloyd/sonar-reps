@@ -6,6 +6,7 @@
 import SwiftUI
 
 struct DepthGauge: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let depthCm: Double
     let repLineCm: Double
     let peakCm: Double
@@ -23,11 +24,12 @@ struct DepthGauge: View {
             let usable = h * 0.76
             let y = { (cm: Double) -> CGFloat in top + CGFloat(min(max(cm, 0), Self.maxCm) / Self.maxCm) * usable }
             let deep = repLineCm > 0 && depthCm >= repLineCm
-            let barColor = deep ? Theme.warn : Theme.accent
+            let barColor = deep ? Theme.accent : Theme.text
 
             ZStack(alignment: .topLeading) {
                 RoundedRectangle(cornerRadius: 14).fill(Theme.surface)
-                RoundedRectangle(cornerRadius: 14).fill(Theme.accent.opacity(hit ? 0.16 : 0))
+                RoundedRectangle(cornerRadius: 14).strokeBorder(Theme.hairline, lineWidth: 1)
+                RoundedRectangle(cornerRadius: 14).fill(Theme.accent.opacity(hit ? 0.10 : 0))
 
                 // Scale: a tick every 5 cm, a number every 10.
                 Canvas { ctx, _ in
@@ -54,7 +56,7 @@ struct DepthGauge: View {
                         p.addLine(to: CGPoint(x: w, y: y(repLineCm)))
                     }
                     .stroke(Theme.warn.opacity(0.85), style: StrokeStyle(lineWidth: 1.5, dash: [5, 4]))
-                    Caption("Rep line \(Int(repLineCm.rounded())) cm", color: Theme.warn, size: 9)
+                    Caption("Target \(Int(repLineCm.rounded())) cm", color: Theme.warn, size: 11)
                         .position(x: w / 2, y: y(repLineCm) + 11)
                 }
 
@@ -70,7 +72,7 @@ struct DepthGauge: View {
                     .position(x: w / 2 + 8, y: y(depthCm))
                     .animation(.easeOut(duration: 0.12), value: depthCm)
 
-                if live {
+                if live && !reduceMotion {
                     SonarPings()
                         .frame(width: w, height: h * 0.34)
                         .position(x: w / 2, y: h - 22 - h * 0.17)
@@ -88,6 +90,11 @@ struct DepthGauge: View {
             }
             .clipShape(RoundedRectangle(cornerRadius: 14))
         }
+        .accessibilityElement()
+        .accessibilityLabel("Depth")
+        .accessibilityValue(repLineCm > 0
+            ? String(format: "%.0f centimetres, target %.0f", max(0, depthCm), repLineCm)
+            : String(format: "%.0f centimetres", max(0, depthCm)))
     }
 }
 
@@ -95,8 +102,7 @@ struct DepthGauge: View {
 private struct PhoneGlyph: View {
     var body: some View {
         RoundedRectangle(cornerRadius: 3)
-            .stroke(Theme.muted, lineWidth: 1.5)
-            .background(RoundedRectangle(cornerRadius: 3).fill(Theme.bg))
+            .fill(Theme.text)
     }
 }
 
@@ -112,7 +118,7 @@ private struct SonarPings: View {
                     let r = 8 + phase * Double(size.height - 8)
                     var arc = Path()
                     arc.addArc(center: base, radius: r, startAngle: .degrees(205), endAngle: .degrees(335), clockwise: false)
-                    ctx.stroke(arc, with: .color(Theme.accent.opacity(0.45 * (1 - phase))), lineWidth: 1.2)
+                    ctx.stroke(arc, with: .color(Theme.accent.opacity(0.35 * (1 - phase))), lineWidth: 1.2)
                 }
             }
         }
@@ -123,8 +129,8 @@ private struct WaitingText: View {
     @State private var dim = false
     var body: some View {
         VStack(spacing: 6) {
-            Caption("Waiting for", size: 10)
-            Caption("sonar stream", size: 10)
+            Caption("Connecting", size: 13)
+            Caption("Keep still", size: 12)
         }
         .opacity(dim ? 0.3 : 1)
         .onAppear {
