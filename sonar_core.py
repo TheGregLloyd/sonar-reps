@@ -1,19 +1,25 @@
 """Sonar core: turn a phone's own speaker and microphone into a short-range sonar.
 
-The speaker plays one or more continuous near-ultrasonic tones (18 to 20 kHz).
-The microphone hears the direct sound plus echoes. A chest moving towards or
-away from the phone changes the length of the echo path, which rotates the
-phase of the echo. Tracking that phase gives the chest's movement to within a
-few millimetres (the method used by LLAP, MobiCom 2016).
+The speaker plays a few continuous near-ultrasonic tones (18 to 20 kHz). The
+microphone hears the direct sound plus echoes. A chest moving towards or away
+from the phone changes the length of the echo path, which rotates the phase of
+the echo: one full turn for every half wavelength, about 0.9 cm.
 
-Pipeline, per tone:
-    mic samples -> mix down to 0 Hz (I/Q) -> low-pass -> decimate to ~1 kHz
-    -> remove the static part (direct path, floor, walls)
-    -> phase change between samples -> path change -> displacement
+Pipeline:
+    mic samples
+    -> per tone: mix down to 0 Hz (I/Q), low-pass, null the other tones,
+       decimate to ~1 kHz
+    -> per tone: remove the static part (direct sound, floor, walls) with a
+       2 Hz high-pass, which also takes out slow drift of the speaker
+    -> all tones together: phase step per sample from the lag-1 products
+       (the pulse-pair estimate used in Doppler radar and ultrasound)
+    -> path change -> displacement
 
-Tones are combined with a median so one tone fading in a multipath null does
-not break tracking. Everything is block based, so the same code runs on a live
-stream or on a recorded file.
+Summing the lag-1 products over tones and over a few milliseconds weights
+each tone by its echo strength, so a tone fading in a multipath null drops
+out by itself, and noise pulls the estimate towards "not moving" instead of
+sending it wandering. Everything is block based, so the same code runs on a
+live stream or on a recorded file.
 """
 
 from __future__ import annotations
@@ -22,7 +28,7 @@ from dataclasses import dataclass, field
 from typing import List, Optional, Sequence
 
 import numpy as np
-from scipy.signal import butter, sosfilt, sosfilt_zi
+from scipy.signal import butter, lfilter, sosfilt, sosfilt_zi
 
 SPEED_OF_SOUND = 343.0  # m/s at about 20 C
 
@@ -31,65 +37,39 @@ SPEED_OF_SOUND = 343.0  # m/s at about 20 C
 class SonarConfig:
     fs: int = 48_000
     tones_hz: Sequence[float] = (18_500.0, 19_100.0, 19_700.0)
-    lowpass_hz: float = 250.0  # keeps Doppler up to about 2 m/s
+    lowpass_hz: float = 150.0  # keeps Doppler up to about 1.3 m/s
     decim: int = 48  # 48 kHz -> 1 kHz baseband
-    # Static-vector estimate: fit a circle to the last fit_window_s of I/Q.
-    fit_window_s: float = 0.15
-    fit_every: int = 10  # refit every N baseband samples (10 ms)
-    fit_max_resid: float = 0.15  # median radial error as a share of radius
-    fit_min_sweep_rad: float = np.pi  # samples must cover half a turn
-    fit_min_radius: float = 1e-6  # echo must be above this (mic units)
+    static_hz: float = 2.0  # anything slower than this is static (about 2 cm/s)
+    average_ms: int = 32  # lag-1 products are averaged over this long
 
 
 class ToneTracker:
-    """Phase tracker for one carrier tone, streaming."""
+    """Baseband echo of one carrier tone with the static part removed, streaming."""
 
     def __init__(self, cfg: SonarConfig, f_hz: float):
         self.cfg = cfg
         self.f = f_hz
-        self.wavelength = SPEED_OF_SOUND / f_hz
         self.sos = butter(4, cfg.lowpass_hz, fs=cfg.fs, output="sos")
         zi = sosfilt_zi(self.sos)
         self.zi_i = zi * 0.0
         self.zi_q = zi * 0.0
+        # Moving average over one beat of the tone spacing: its nulls sit
+        # exactly on the other tones. On a phone the direct sound of each
+        # tone is about 200 times stronger than the echo, so what the
+        # low-pass lets through of a neighbour would swamp the echo.
+        gaps = [abs(f - f_hz) for f in cfg.tones_hz if f != f_hz]
+        n_avg = int(round(cfg.fs / min(gaps))) if gaps else 1
+        self.avg = np.ones(n_avg) / n_avg
+        self.za_i = np.zeros(n_avg - 1)
+        self.za_q = np.zeros(n_avg - 1)
         self.n = 0  # global sample index
-        fs_d = cfg.fs / cfg.decim
-        self.win = max(40, int(cfg.fit_window_s * fs_d))
-        self.buf: List[complex] = []
-        self.static: Optional[complex] = None
-        self.prev_dyn: Optional[complex] = None
-        self.since_fit = 0
-
-    def _fit_circle(self) -> Optional[complex]:
-        """Centre of the circle the I/Q samples trace while the chest moves.
-        The centre is the static vector (direct sound plus still echoes).
-        Accept only when the samples sweep enough of the circle to pin it."""
-        z = np.asarray(self.buf[-self.win:])
-        x, y = z.real, z.imag
-        A = np.column_stack([2 * x, 2 * y, np.ones_like(x)])
-        b = x * x + y * y
-        try:
-            (cx, cy, k), *_ = np.linalg.lstsq(A, b, rcond=None)
-        except np.linalg.LinAlgError:
-            return None
-        r2 = k + cx * cx + cy * cy
-        if r2 <= 0:
-            return None
-        c = complex(cx, cy)
-        r = np.sqrt(r2)
-        resid = np.abs(np.abs(z - c) - r)
-        if np.median(resid) > self.cfg.fit_max_resid * r:
-            return None
-        ang = np.unwrap(np.angle(z - c))
-        if ang.max() - ang.min() < self.cfg.fit_min_sweep_rad:
-            return None
-        if r < self.cfg.fit_min_radius:
-            return None
-        return c
+        # Static removal. Second order, so a steady drift of the direct
+        # sound (a phone speaker warming up) is removed as well as its level.
+        self.hp = butter(2, cfg.static_hz, btype="highpass", fs=cfg.fs / cfg.decim, output="sos")
+        self.zs: Optional[np.ndarray] = None
 
     def process(self, x: np.ndarray) -> np.ndarray:
-        """Return displacement increments (metres, positive = towards phone)
-        at the decimated rate for this block."""
+        """Return the moving part of the echo (complex) at the decimated rate."""
         cfg = self.cfg
         idx = self.n + np.arange(len(x))
         w = 2.0 * np.pi * self.f / cfg.fs
@@ -97,56 +77,33 @@ class ToneTracker:
         q = -x * np.sin(w * idx)
         i, self.zi_i = sosfilt(self.sos, i, zi=self.zi_i)
         q, self.zi_q = sosfilt(self.sos, q, zi=self.zi_q)
+        i, self.za_i = lfilter(self.avg, 1.0, i, zi=self.za_i)
+        q, self.za_q = lfilter(self.avg, 1.0, q, zi=self.za_q)
         keep = (idx % cfg.decim) == 0
         self.n += len(x)
         z = (i[keep] + 1j * q[keep]) * 2.0
-
-        out: List[float] = []
-        scale = self.wavelength / (4.0 * np.pi)  # phase -> reflector movement
-        for zk in z:
-            replay = 0.0
-            self.buf.append(zk)
-            if len(self.buf) > 4 * self.win:
-                del self.buf[: len(self.buf) - 2 * self.win]
-            self.since_fit += 1
-            if len(self.buf) >= self.win and self.since_fit >= cfg.fit_every:
-                self.since_fit = 0
-                c = self._fit_circle()
-                if c is not None:
-                    if self.static is None:
-                        # First lock: replay the buffered window so the start
-                        # of the first movement is not lost.
-                        self.static = c
-                        prev = None
-                        for zb in self.buf[-self.win:-1]:
-                            d = zb - c
-                            if prev is not None:
-                                replay += np.angle(d * np.conj(prev)) * scale
-                            prev = d
-                        self.prev_dyn = prev
-                    else:
-                        self.static = c
-            if self.static is None:
-                out.append(0.0)
-                continue
-            dyn = zk - self.static
-            inc = replay
-            if self.prev_dyn is not None:
-                # Phase rises as the echo path shortens; the path changes by
-                # twice the reflector's movement.
-                inc += np.angle(dyn * np.conj(self.prev_dyn)) * scale
-            out.append(inc)
-            self.prev_dyn = dyn
-        return np.asarray(out)
+        if len(z) == 0:
+            return z
+        if self.zs is None:
+            self.zs = sosfilt_zi(self.hp) * z[0]  # as if the signal had always been here
+        d, self.zs = sosfilt(self.hp, z, zi=self.zs)
+        return d
 
 
 class SonarTracker:
-    """Combines several tones into one displacement stream."""
+    """Combines the tones into one displacement stream."""
 
     def __init__(self, cfg: SonarConfig = SonarConfig()):
         self.cfg = cfg
         self.trackers = [ToneTracker(cfg, f) for f in cfg.tones_hz]
         self.position_m = 0.0
+        self.prev = np.zeros(len(cfg.tones_hz), dtype=complex)
+        n_avg = max(1, int(round(cfg.average_ms * 1e-3 * self.rate_hz)))
+        self.avg = np.ones(n_avg) / n_avg
+        self.za = np.zeros(n_avg - 1, dtype=complex)
+        # Phase to reflector movement. The tones are within 3 % of each other,
+        # so one wavelength serves for the sum.
+        self.scale = SPEED_OF_SOUND / float(np.mean(cfg.tones_hz)) / (4.0 * np.pi)
 
     @property
     def rate_hz(self) -> float:
@@ -155,17 +112,18 @@ class SonarTracker:
     def process(self, x: np.ndarray) -> np.ndarray:
         """Feed raw mic samples, get cumulative displacement in metres
         (positive = closer to the phone) at about 1 kHz."""
-        incs = np.vstack([t.process(x) for t in self.trackers])
-        nz = incs != 0.0
-        # Median over tones that saw motion; zero if none did.
-        med = np.zeros(incs.shape[1])
-        for k in range(incs.shape[1]):
-            v = incs[nz[:, k], k]
-            if len(v):
-                med[k] = np.median(v)
-        pos = self.position_m + np.cumsum(med)
-        if len(pos):
-            self.position_m = pos[-1]
+        d = np.vstack([t.process(x) for t in self.trackers])
+        if d.shape[1] == 0:
+            return np.zeros(0)
+        # Lag-1 products: each one turns by the phase the echo gained in one
+        # sample. Phase rises as the echo path shortens, and the path changes
+        # by twice the reflector's movement.
+        before = np.column_stack([self.prev, d[:, :-1]])
+        self.prev = d[:, -1].copy()
+        p = (d * np.conj(before)).sum(axis=0)
+        p, self.za = lfilter(self.avg, 1.0, p, zi=self.za)
+        pos = self.position_m + np.cumsum(np.angle(p) * self.scale)
+        self.position_m = pos[-1]
         return pos
 
 

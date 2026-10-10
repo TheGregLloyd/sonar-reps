@@ -12,10 +12,11 @@ Your phone already has a sonar. Sonar Reps plays near-ultrasonic tones (18.5 to 
 
 ```
 speaker: 3 tones (18.5, 19.1, 19.7 kHz)  ->  chest  ->  mic
-mic -> mix each tone to 0 Hz (I/Q) -> low-pass, 1 kHz
-    -> remove the static path (circle fit, as in LLAP)
-    -> phase change -> path change -> chest movement (lambda/4pi per radian)
-    -> median over tones -> rep state machine (depth, return, rest)
+mic -> mix each tone to 0 Hz (I/Q) -> low-pass, null the other tones, 1 kHz
+    -> remove the static path (2 Hz high-pass)
+    -> phase step per sample from all tones at once (pulse-pair, as in Doppler radar)
+    -> path change -> chest movement (lambda/4pi per radian)
+    -> rep state machine (depth, return, rest)
 ```
 
 At 19 kHz the wavelength is 1.8 cm, so one full turn of echo phase is 0.9 cm of chest movement. A push-up is about 25 cm, roughly 28 turns.
