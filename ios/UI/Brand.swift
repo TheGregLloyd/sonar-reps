@@ -35,9 +35,9 @@ struct LogoMark: View {
 struct AppIconArt: View {
     var body: some View {
         ZStack {
-            Theme.bg
-            LogoMark()
-                .padding(170)
+            Color(hex: 0x2A47C4)
+            LogoMark(color: .white)
+                .padding(190)
         }
         .frame(width: 1024, height: 1024)
     }

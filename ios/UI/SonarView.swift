@@ -1,7 +1,9 @@
 // SonarView.swift
-// Root screen. Before a set: one Start button. During a set the phone lies
+// Root screen, in three states. Home: personal best, recent sets, Start.
+// During a set the phone lies
 // under the chest and nothing needs a touch: the count, the depth column, the
 // rep history and the trace all read from 30 to 60 cm away.
+// After Stop: the result of the set, saved to the set log.
 // No sound and no haptics anywhere: the speaker is the sonar, and a vibration
 // would trip the motion check and block counting.
 
@@ -10,6 +12,7 @@ import SwiftUI
 struct SonarView: View {
     @StateObject private var session = SonarSession()
     @StateObject private var history = MotionHistory()
+    @StateObject private var log = SetLog()
     @AppStorage("sonarMacHost") private var macHost = "172.20.10.11"
 
     @State private var countScale: CGFloat = 1
@@ -17,10 +20,13 @@ struct SonarView: View {
     @State private var noRepDetail: String?
     @State private var noRepToken = 0
     @AppStorage("sonarSeenIntro") private var seenIntro = false
+    @AppStorage("sonarDeveloperMode") private var developerMode = false
     @State private var showIntro = false
-    @State private var showSummary = false
+    @State private var showSettings = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var setStart = Date()
-    @State private var setDuration: TimeInterval = 0
+    @State private var result: SetRecord?
+    @State private var resultIsBest = false
 
     var body: some View {
         ZStack(alignment: .top) {
@@ -28,16 +34,26 @@ struct SonarView: View {
 
             VStack(spacing: 16) {
                 header
-                VStack(spacing: 16) {
-                    readout
-                    section("Set") { RepHistory(reps: session.reps, repLineCm: session.repLineCm) }
-                        .frame(height: 78)
-                    section("Chest movement, last 12 s") { TraceView(history: history, repLineCm: session.repLineCm) }
-                        .frame(height: 104)
+                if session.running {
+                    VStack(spacing: 16) {
+                        readout
+                        section("This set") { RepHistory(reps: session.reps, repLineCm: session.repLineCm) }
+                            .frame(height: 78)
+                        section("Your movement") { TraceView(history: history, repLineCm: session.repLineCm) }
+                            .frame(height: 104)
+                            .accessibilityElement()
+                            .accessibilityLabel("Movement trace")
+                            .accessibilityValue(String(format: "%.0f centimetres down", max(0, session.depthCm)))
+                    }
+                    .grayscale(session.phoneMoving ? 1 : 0)
+                    .opacity(session.phoneMoving ? 0.4 : 1)
+                    .animation(.easeOut(duration: 0.18), value: session.phoneMoving)
+                } else if let result {
+                    ResultPanel(record: result, isNewBest: resultIsBest, best: log.best,
+                                reps: session.reps, repLineCm: session.repLineCm)
+                } else {
+                    HomePanel(best: log.best, recent: log.records)
                 }
-                .grayscale(session.phoneMoving ? 1 : 0)
-                .opacity(session.phoneMoving ? 0.4 : 1)
-                .animation(.easeOut(duration: 0.18), value: session.phoneMoving)
                 controls
             }
             .padding(.horizontal, 20)
@@ -47,7 +63,7 @@ struct SonarView: View {
             if session.phoneMoving {
                 PhoneMovedBanner()
                     .padding(.top, 4)
-                    .transition(.move(edge: .top).combined(with: .opacity))
+                    .transition(reduceMotion ? .opacity : .move(edge: .top).combined(with: .opacity))
             }
 
             if let detail = noRepDetail {
@@ -56,15 +72,14 @@ struct SonarView: View {
             }
         }
         .animation(.easeOut(duration: 0.18), value: session.phoneMoving)
-        .preferredColorScheme(.dark)
+        .sonarAppearance()
         .onAppear {
             UIApplication.shared.isIdleTimerDisabled = true
             if !seenIntro { showIntro = true }
         }
         .sheet(isPresented: $showIntro, onDismiss: { seenIntro = true }) { HowItWorks() }
-        .sheet(isPresented: $showSummary) {
-            SetSummary(reps: session.reps, repLineCm: session.repLineCm,
-                       duration: setDuration, fileURL: session.lastFileURL)
+        .sheet(isPresented: $showSettings) {
+            SettingsView(session: session, log: log) { showIntro = true }
         }
         .onChange(of: session.depthCm) { history.add(depth: session.depthCm) }
         .onChange(of: session.reps.count) { old, new in
@@ -78,40 +93,30 @@ struct SonarView: View {
     // MARK: Header
 
     private var header: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(alignment: .center, spacing: 10) {
-                LogoMark().frame(width: 26, height: 26)
-                Text("SONAR REPS")
-                    .font(Theme.display(24))
-                    .tracking(3)
-                    .foregroundStyle(Theme.text)
-                Spacer()
-                if session.running {
-                    TimelineView(.periodic(from: setStart, by: 1)) { tl in
-                        Text(SetSummary.clock(tl.date.timeIntervalSince(setStart)))
-                            .font(.system(size: 13, weight: .semibold).monospacedDigit())
-                            .foregroundStyle(Theme.muted)
-                    }
-                } else {
-                    Button { showIntro = true } label: {
-                        Image(systemName: "info.circle")
-                            .font(.system(size: 17))
-                            .foregroundStyle(Theme.muted)
-                    }
-                    .buttonStyle(.plain)
+        HStack(alignment: .center, spacing: 10) {
+            LogoMark().frame(width: 26, height: 26)
+                .accessibilityHidden(true)
+            Text("SONAR REPS")
+                .font(Theme.display(24))
+                .tracking(3)
+                .foregroundStyle(Theme.text)
+            Spacer()
+            if session.running {
+                TimelineView(.periodic(from: setStart, by: 1)) { tl in
+                    Text(clockText(tl.date.timeIntervalSince(setStart)))
+                        .font(.system(size: 15, weight: .semibold).monospacedDigit())
+                        .foregroundStyle(Theme.muted)
                 }
                 StatusPill(state: pillState)
+            } else {
+                HeaderIcon(symbol: "gearshape", label: "Settings") { showSettings = true }
             }
-            Text("No camera. Three tones near 19 kHz, echoing off your chest.")
-                .font(.system(size: 12))
-                .foregroundStyle(Theme.muted)
-                .lineLimit(2)
         }
+        .frame(height: 36)
     }
 
     private var pillState: StatusPill.State {
-        if !session.running { return session.source == .demo ? .demo : .ready }
-        return session.live ? .live : .waiting
+        session.live ? .live : .waiting
     }
 
     // MARK: Count and depth
@@ -131,6 +136,7 @@ struct SonarView: View {
                         .lineLimit(1)
                         .minimumScaleFactor(0.3)
                         .scaleEffect(countScale, anchor: .bottomLeading)
+                        .accessibilityLabel("\(session.count) \(session.count == 1 ? "rep" : "reps")")
                     Spacer(minLength: 0)
                     HStack(alignment: .top, spacing: 22) {
                         Stat(label: "No reps", value: "\(session.noReps)",
@@ -146,7 +152,7 @@ struct SonarView: View {
                             .font(Theme.display(28))
                             .monospacedDigit()
                             .foregroundStyle(Theme.text)
-                        Caption("cm down", size: 9)
+                        Caption("cm", size: 12)
                     }
                     DepthGauge(depthCm: session.depthCm, repLineCm: session.repLineCm,
                                peakCm: history.peakCm, live: session.running && session.live,
@@ -167,91 +173,58 @@ struct SonarView: View {
     @ViewBuilder
     private var controls: some View {
         if session.running {
-            HStack(spacing: 10) {
-                SmallButton(title: "Stop") { stopSet() }
-                SmallButton(title: "Reset") {
-                    session.reset()
-                    setStart = Date()
+            VStack(spacing: 8) {
+                if developerMode && session.lostPackets > 0 {
+                    Caption("Lost \(session.lostPackets) packets", color: Theme.faint, size: 12)
+                        .frame(maxWidth: .infinity, alignment: .trailing)
                 }
-                Spacer()
-                if session.lostPackets > 0 { Caption("Lost \(session.lostPackets)", color: Theme.faint, size: 10) }
+                HStack(spacing: 12) {
+                    PrimaryButton(title: "Stop", systemImage: "stop.fill",
+                                  fill: Theme.text, ink: Theme.bg) { stopSet() }
+                    SecondaryButton(title: "Restart", systemImage: "arrow.counterclockwise") {
+                        session.reset()
+                        setStart = Date()
+                    }
+                    .frame(width: 130)
+                }
             }
-            .frame(height: 40)
         } else {
             VStack(spacing: 12) {
-                if session.source == .live {
-                    HStack(spacing: 12) {
-                        Caption("Mac address", size: 10)
-                        TextField("172.20.10.11", text: $macHost)
-                            .font(.system(size: 15, weight: .medium).monospacedDigit())
-                            .foregroundStyle(Theme.text)
-                            .textFieldStyle(.plain)
-                            .keyboardType(.numbersAndPunctuation)
-                            .textInputAutocapitalization(.never)
-                            .autocorrectionDisabled()
-                            .multilineTextAlignment(.trailing)
-                    }
-                    .padding(.horizontal, 14)
-                    .frame(height: 44)
-                    .background(RoundedRectangle(cornerRadius: 12).fill(Theme.surface))
-                }
-
-                Button {
-                    history.clear()
-                    setStart = Date()
-                    session.start(macHost: macHost)
-                } label: {
-                    Text("START SET")
-                        .font(Theme.display(24))
-                        .tracking(2)
-                        .foregroundStyle(Color.black)
-                        .frame(maxWidth: .infinity)
-                        .frame(height: 58)
-                        .background(RoundedRectangle(cornerRadius: 14).fill(Theme.accent))
-                }
-                .buttonStyle(.plain)
-
-                HStack {
-                    Text(summary)
-                        .font(.system(size: 12))
-                        .foregroundStyle(Theme.muted)
-                        .lineLimit(2)
-                    Spacer(minLength: 8)
-                    if let url = session.lastFileURL {
-                        ShareLink(item: url) {
-                            Label("Share take", systemImage: "square.and.arrow.up")
-                                .font(.system(size: 12, weight: .semibold))
-                                .foregroundStyle(Theme.accent)
-                        }
-                    }
-                }
-                if let error = session.error {
-                    Text(error)
-                        .font(.system(size: 12))
+                PrimaryButton(title: result == nil ? "Start set" : "Start next set") { startSet() }
+                if result != nil {
+                    SecondaryButton(title: "Done") { withAnimation(.easeOut(duration: 0.2)) { result = nil } }
+                } else if session.error != nil {
+                    Label("Sonar couldn't start. Check that Sonar Reps can use the microphone in Settings.",
+                          systemImage: "exclamationmark.circle")
+                        .font(.subheadline)
                         .foregroundStyle(Theme.noRep)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                } else {
+                    Text("Put the phone face-up under your chest, press Start, then hands off.")
+                        .font(.subheadline)
+                        .foregroundStyle(Theme.muted)
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
         }
     }
 
-    /// Before the first set, how to use it. After a set, what happened.
-    private var summary: String {
-        let counted = session.reps.filter(\.valid)
-        guard !session.reps.isEmpty else {
-            return "Phone face-up under your chest. Press start, then hands off."
-        }
-        var s = "Last set: \(counted.count) reps, \(session.noReps) no rep\(session.noReps == 1 ? "" : "s")"
-        if let deep = counted.map(\.depthCm).max(), let shallow = counted.map(\.depthCm).min() {
-            s += String(format: ", %.0f to %.0f cm", shallow, deep)
-        }
-        return s + "."
+    private func startSet() {
+        history.clear()
+        result = nil
+        setStart = Date()
+        session.start(macHost: macHost)
     }
 
     private func stopSet() {
-        setDuration = Date().timeIntervalSince(setStart)
+        let duration = Date().timeIntervalSince(setStart)
         session.stop()
-        if !session.reps.isEmpty { showSummary = true }
+        guard !session.reps.isEmpty else { return }
+        let counted = session.reps.filter(\.valid)
+        let record = SetRecord(date: setStart, reps: counted.count, noReps: session.reps.count - counted.count,
+                               duration: duration, depths: counted.map(\.depthCm))
+        resultIsBest = log.add(record)
+        result = record
     }
 
     // MARK: Verdicts
@@ -260,7 +233,7 @@ struct SonarView: View {
         var instant = Transaction()
         instant.disablesAnimations = true
         withTransaction(instant) {
-            countScale = 1.14
+            if !reduceMotion { countScale = 1.14 }
             hit = true
         }
         DispatchQueue.main.async {
@@ -270,9 +243,9 @@ struct SonarView: View {
     }
 
     private func refuse(_ rep: RepEvent) {
-        let reason = rep.reason.isEmpty ? "not counted" : rep.reason
-        var detail = String(format: "%@: %.1f cm", reason, rep.depthCm)
-        if session.repLineCm > 0 { detail += String(format: " of %.0f", session.repLineCm) }
+        let reason = rep.reason.isEmpty ? "Not counted" : rep.reason.prefix(1).uppercased() + rep.reason.dropFirst()
+        var detail = String(format: "%@. You reached %.0f cm", reason, rep.depthCm)
+        detail += session.repLineCm > 0 ? String(format: " of %.0f cm.", session.repLineCm) : "."
         noRepToken += 1
         let token = noRepToken
         withAnimation(.easeOut(duration: 0.08)) { noRepDetail = detail }
@@ -286,7 +259,7 @@ struct SonarView: View {
 
     private func section<Content: View>(_ title: String, @ViewBuilder content: () -> Content) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            Caption(title, size: 10)
+            Caption(title, size: 12)
             content()
         }
         .padding(.top, 12)
@@ -302,33 +275,33 @@ private struct Stat: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
-            Caption(label, size: 10)
+            Caption(label, size: 12)
             HStack(alignment: .firstTextBaseline, spacing: 3) {
                 Text(value)
                     .font(Theme.display(34))
                     .monospacedDigit()
                     .foregroundStyle(color)
-                if !unit.isEmpty { Caption(unit, size: 10) }
+                if !unit.isEmpty { Caption(unit, size: 12) }
             }
         }
     }
 }
 
-private struct SmallButton: View {
-    let title: String
+private struct HeaderIcon: View {
+    let symbol: String
+    let label: String
     let action: () -> Void
 
     var body: some View {
         Button(action: action) {
-            Text(title.uppercased())
-                .font(.system(size: 12, weight: .semibold))
-                .tracking(1.4)
+            Image(systemName: symbol)
+                .font(.system(size: 16, weight: .regular))
                 .foregroundStyle(Theme.muted)
-                .padding(.horizontal, 16)
-                .frame(height: 36)
-                .overlay(RoundedRectangle(cornerRadius: 10).strokeBorder(Theme.faint, lineWidth: 1))
+                .frame(width: 44, height: 44)
+                .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .accessibilityLabel(label)
     }
 }
 
@@ -341,7 +314,7 @@ struct StatusPill: View {
         HStack(spacing: 6) {
             Circle().fill(color).frame(width: 7, height: 7)
                 .opacity(state == .live && blink ? 0.25 : 1)
-            Caption(title, color: color, size: 10)
+            Caption(title, color: color, size: 12)
         }
         .padding(.horizontal, 10)
         .frame(height: 24)
@@ -355,8 +328,8 @@ struct StatusPill: View {
         switch state {
         case .ready: return "Ready"
         case .demo: return "Demo"
-        case .live: return "Live"
-        case .waiting: return "Waiting"
+        case .live: return "Listening"
+        case .waiting: return "Connecting"
         }
     }
 
