@@ -5,12 +5,15 @@ static echoes from floor and walls, a chest echo whose distance follows a
 push-up set, plus noise. Then checks that the tracker and rep counter recover
 the right reps, including a shallow rep that must not count.
 
+Then replays the real recordings in takes/ as regression tests.
+
 Run:  python simulate.py
 """
 
 import numpy as np
 
 from sonar_core import SPEED_OF_SOUND, RepCounter, SonarConfig, SonarTracker
+from takes import run_all
 
 
 def chest_distance(t, reps, top=0.35):
@@ -76,4 +79,6 @@ if __name__ == "__main__":
     results.append(run_case("noisy (10 dB SNR)", reps, 16.0, 8, 0, snr_db=10.0, seed=3))
     # Nobody there: must count nothing.
     results.append(run_case("empty floor", [], 10.0, 0, 0, seed=5))
+    # Real recordings stored with takes.py must keep their counts.
+    results.append(run_all())
     print("ALL PASS" if all(results) else "SOME FAILED")

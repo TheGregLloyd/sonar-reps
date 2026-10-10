@@ -1,0 +1,17 @@
+[
+  {
+    "name": "book_10",
+    "file": "book_10.flac",
+    "kind": "book over laptop",
+    "true_reps": 10,
+    "min_depth_cm": 10.0,
+    "tones_hz": [
+      18500.0,
+      19100.0,
+      19700.0
+    ],
+    "note": "MacBook Air, volume 50 percent, book moved by hand about 10 to 30 cm above the keyboard. Depth line lowered to 10 cm because the travel was hand-held.",
+    "expect_valid": 10,
+    "expect_shallow": 0
+  }
+]
