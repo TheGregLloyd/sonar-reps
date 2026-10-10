@@ -2,3 +2,5 @@ __pycache__/
 *.wav
 recordings/
 .venv/
+ios/*.xcodeproj/
+ios/build/
