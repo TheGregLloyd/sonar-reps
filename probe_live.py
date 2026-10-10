@@ -7,10 +7,11 @@ Two modes:
       the microphone compared with the noise next to it. This answers "can
       this hardware do 19 kHz?" in one go. Aim for 20 dB or more per tone.
 
-  python probe_live.py [--record take.wav] [--min-depth 15]
+  python probe_live.py [--record take.wav] [--min-depth 15] [--seconds 40]
       Live tracking. Move your hand or a book up and down 10 to 30 cm above
       the keyboard, or put the laptop on the floor and do push-ups over it.
-      Prints position (cm, positive = closer) and the rep count.
+      Prints position (cm, positive = closer) and the rep count. Stops on
+      Ctrl+C, or by itself after --seconds.
 
 Install:  pip install numpy scipy sounddevice soundfile
 """
@@ -49,7 +50,7 @@ def check(cfg: SonarConfig, amp: float, seconds: float = 3.0):
     print("Hardware can do it." if ok else "Some tones are weak: raise volume or drop those tones.")
 
 
-def live(cfg: SonarConfig, amp: float, record: str, min_depth: float):
+def live(cfg: SonarConfig, amp: float, record: str, min_depth: float, seconds: float = 0.0):
     q: "queue.Queue[np.ndarray]" = queue.Queue()
     n_out = [0]
     ramp_len = int(0.05 * cfg.fs)
@@ -73,10 +74,12 @@ def live(cfg: SonarConfig, amp: float, record: str, min_depth: float):
         writer = sf.SoundFile(record, "w", samplerate=cfg.fs, channels=1, subtype="FLOAT")
     print("Tracking. Ctrl+C to stop. Warm-up: wave once to lock on.")
     last_print = 0.0
+    n_in = 0
     with sd.Stream(samplerate=cfg.fs, blocksize=1024, channels=1, dtype="float32", callback=cb):
         try:
             while True:
                 x = q.get()
+                n_in += len(x)
                 if writer:
                     writer.write(x)
                 pos = tracker.process(x.astype(np.float64))
@@ -90,6 +93,8 @@ def live(cfg: SonarConfig, amp: float, record: str, min_depth: float):
                     bar = int(np.clip(depth * 2, 0, 60))
                     sys.stdout.write(f"\r  depth {depth:5.1f} cm  |{'#'*bar:<60}|  reps {counter.count}  ")
                     sys.stdout.flush()
+                if seconds and n_in >= seconds * cfg.fs:
+                    break
         except KeyboardInterrupt:
             pass
     if writer:
@@ -105,10 +110,11 @@ if __name__ == "__main__":
     ap.add_argument("--amp", type=float, default=0.3, help="tone level 0 to 1")
     ap.add_argument("--record", default="")
     ap.add_argument("--min-depth", type=float, default=15.0)
+    ap.add_argument("--seconds", type=float, default=0.0, help="stop after this long (0 = until Ctrl+C)")
     ap.add_argument("--tones", default="18500,19100,19700")
     a = ap.parse_args()
     cfg = SonarConfig(tones_hz=tuple(float(f) for f in a.tones.split(",")))
     if a.check:
         check(cfg, a.amp)
     else:
-        live(cfg, a.amp, a.record, a.min_depth)
+        live(cfg, a.amp, a.record, a.min_depth, a.seconds)
