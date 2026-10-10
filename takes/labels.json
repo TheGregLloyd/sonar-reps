@@ -43,5 +43,20 @@
     "note": "iPhone 16 Pro Max face-up on the floor, plugged in, tone level 0.3, carriers at 0.003. 10 reps confirmed by Addy. The one NO REP is him getting into position at 1.4 s.",
     "expect_valid": 10,
     "expect_shallow": 1
+  },
+  {
+    "name": "phone_live_4",
+    "file": "phone_live_4.flac",
+    "kind": "push-ups over iPhone, streamed live",
+    "true_reps": 10,
+    "min_depth_cm": 8.0,
+    "tones_hz": [
+      18500.0,
+      19100.0,
+      19700.0
+    ],
+    "note": "iPhone 16 Pro Max face-up on the floor, tone level 0.3, carriers at 0.002. First set streamed live to the Mac over the iPhone hotspot. 10 cycles in the trace; the true count is not yet confirmed by Addy. Depths fade over the last three reps.",
+    "expect_valid": 10,
+    "expect_shallow": 0
   }
 ]

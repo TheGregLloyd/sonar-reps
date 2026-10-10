@@ -98,3 +98,29 @@ The one NO REP is a 6 cm movement at 1.4 s, Addy getting into position, so rejec
 These reps were slower (about 4 s apart) and read about twice as deep as the 13 quick ones at 10:59. Whether those were really shallower or the reading depends on speed or placement is not known yet.
 
 Stored as `takes/phone_pushups_3.flac`.
+
+## 11:25. Fourth set, streamed live to the Mac: stream works, 10 cycles found
+
+Same setup, phone a little quieter (carriers at 0.002). The Mac joined the iPhone hotspot and the app streamed to it while it also saved its own copy.
+
+| Copy | Length | Cycles found | Counted at 8 cm | Counted at 15 cm | Depths |
+|---|---|---|---|---|---|
+| Saved on the phone | 33.1 s | 10 | 10 | 7 | 9.3 to 17.5 cm |
+| Received on the Mac over UDP | 33.5 s | 10 | 10 | 7 | 9.3 to 17.5 cm |
+
+The Mac's copy gives the same 10 reps with the same depths to 0.1 cm, and it holds no filled-in gaps, so no packets were lost. This is the first time the live stream is seen working end to end.
+
+The true count is not yet confirmed by Addy.
+
+What this take shows:
+
+- Depths fade at the end: 17.3, 15.8, 13.2, then 9.3 cm. The last rep clears the 8 cm line by only 1.3 cm.
+- Full push-ups have now read 9.8 to 16.3 cm (10:59), 20.6 to 24.9 cm (11:22) and 9.3 to 17.5 cm (this set). No single depth line can separate a full rep in one set from a half rep in another. Half reps have still not been recorded.
+- The room was loud (audible peaks up to 0.46 of full scale, one click at 2.4 s over full scale) and the count was not affected.
+- The trace sinks about 3 cm per rep here. At 10:59 it climbed. The counter copes either way.
+
+Stored as `takes/phone_live_4.flac`. The band-limited copy reads rep 9 as 15.7 cm against 13.2 cm in the raw file.
+
+## 11:34. A 5 second clip: not a set
+
+Two quick movements, 0.5 s and 0.9 s long, read as reps of 15.1 and 19.0 cm. Too short to be a push-up set, and what was done is not known, so it is not stored as a take. If this was a hand waved over the phone, it shows that a hand can pass as a rep today.
