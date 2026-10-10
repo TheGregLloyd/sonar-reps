@@ -1,7 +1,7 @@
 """Live demo screen: one local web page fed by Server-Sent Events.
 
     display = Display(min_depth_cm=15.0, source="iPhone")
-    display.start()                      # http://localhost:8000
+    display.start()                      # http://localhost:8765
     display.state(counter, moving=False, lost=0)
     display.rep(rep, counter.count)
 
@@ -13,37 +13,14 @@ import json
 import queue
 import threading
 import time
-from collections import deque
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 PAGE = Path(__file__).parent / "display.html"
 
 
-class TopFollower:
-    """Chest height above its lowest level in the last few seconds.
-
-    The rep counter re-anchors its own top the moment a rep closes, which
-    would make a gauge jump. This follows the top smoothly instead."""
-
-    def __init__(self, window_s: float = 8.0):
-        self.window_s = window_s
-        self.q: deque = deque()  # (time, y), y rising from the front
-
-    def depth(self, y: float, t: float) -> float:
-        while self.q and self.q[-1][1] >= y:
-            self.q.pop()
-        self.q.append((t, y))
-        while self.q[0][0] < t - self.window_s:
-            self.q.popleft()
-        return y - self.q[0][1]
-
-    def clear(self):
-        self.q.clear()
-
-
 class Display:
-    def __init__(self, min_depth_cm: float, source: str, port: int = 8000, rate_hz: float = 30.0):
+    def __init__(self, min_depth_cm: float, source: str, port: int = 8765, rate_hz: float = 30.0):
         self.hello = {"min_depth": float(min_depth_cm), "source": source}
         self.port = port
         self.period = 1.0 / rate_hz
@@ -51,7 +28,6 @@ class Display:
         self.lock = threading.Lock()
         self.last_sent = 0.0
         self.reset_requested = False
-        self.top = TopFollower()
 
     def _send(self, event: str, data: dict):
         msg = f"event: {event}\ndata: {json.dumps(data)}\n\n".encode()
@@ -64,11 +40,9 @@ class Display:
 
     def state(self, counter, moving: bool = False, lost: int = 0):
         """Call after every block. Sends at most rate_hz updates a second."""
-        if moving or counter.y is None:
-            self.top.clear()
-            depth = 0.0
-        else:
-            depth = self.top.depth(counter.y, counter.t)
+        # Depth below the counter's own top. It snaps back to zero when a rep
+        # closes, which reads on the gauge as the rep finishing.
+        depth = 0.0 if moving or counter.y is None else max(0.0, counter.y - counter.top)
         now = time.time()
         if now - self.last_sent < self.period:
             return
@@ -88,7 +62,6 @@ class Display:
         """True once after the Reset button on the page was pressed."""
         asked, self.reset_requested = self.reset_requested, False
         if asked:
-            self.top.clear()
             self._send("reset", {})
         return asked
 

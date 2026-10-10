@@ -2,7 +2,7 @@
 
   python phone_receiver.py [--port 5005] [--min-depth 15] [--record take.wav] [--display]
 
---display also serves the live demo screen on http://localhost:8000.
+--display also serves the live demo screen on http://localhost:8765.
 
 Network tip: university Wi-Fi often blocks device-to-device traffic. Turn on
 Personal Hotspot on the iPhone and join it from the Mac; the Mac's address
@@ -27,8 +27,8 @@ def main():
     ap.add_argument("--min-depth", type=float, default=15.0)
     ap.add_argument("--tones", default="18500,19100,19700")
     ap.add_argument("--record", default="")
-    ap.add_argument("--display", type=int, nargs="?", const=8000, default=0, metavar="PORT",
-                    help="serve the live demo screen (default port 8000)")
+    ap.add_argument("--display", type=int, nargs="?", const=8765, default=0, metavar="PORT",
+                    help="serve the live demo screen (default port 8765)")
     a = ap.parse_args()
 
     cfg = SonarConfig(tones_hz=tuple(float(f) for f in a.tones.split(",")))
