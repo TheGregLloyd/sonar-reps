@@ -11,6 +11,7 @@ import argparse
 import socket
 import struct
 import sys
+import time
 
 import numpy as np
 
@@ -39,13 +40,26 @@ def main():
     expected = None
     lost = 0
     blocked = 0
+    last_print = 0.0
     try:
         while True:
             pkt, _ = sock.recvfrom(65536)
             seq, flags = struct.unpack("<II", pkt[:8])
             x = np.frombuffer(pkt[8:], dtype="<f4").astype(np.float64)
             if expected is not None and seq != expected:
-                lost += (seq - expected) & 0xFFFFFFFF
+                gap = (seq - expected) & 0xFFFFFFFF
+                if gap < 1000:
+                    # Packets all carry the same number of samples, so step
+                    # over the hole to keep the tone phase lined up.
+                    lost += gap
+                    skipped = gap * len(x)
+                    for t in tracker.trackers:
+                        t.n += skipped
+                    if writer:
+                        writer.write(np.zeros(skipped, dtype=np.float32))
+                else:
+                    # The phone restarted its stream: lock on again from scratch.
+                    tracker = SonarTracker(cfg)
             expected = (seq + 1) & 0xFFFFFFFF
             if writer:
                 writer.write(x.astype(np.float32))
@@ -60,7 +74,9 @@ def main():
             for r in counter.process(pos):
                 mark = "REP" if r.valid else "NO REP (too shallow)"
                 print(f"\n  {mark}  depth {r.depth_cm:.1f} cm   total {counter.count}")
-            if len(pos):
+            now = time.time()
+            if now - last_print > 0.05 and len(pos):
+                last_print = now
                 depth = (counter.y - counter.top) if counter.y is not None else 0.0
                 bar = int(np.clip(depth * 2, 0, 60))
                 sys.stdout.write(f"\r  depth {depth:5.1f} cm |{'#'*bar:<60}| reps {counter.count}  lost {lost}  ")
