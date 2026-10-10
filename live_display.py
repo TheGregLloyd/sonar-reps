@@ -56,7 +56,8 @@ class Display:
         })
 
     def rep(self, rep, count: int):
-        self._send("rep", {"valid": bool(rep.valid), "depth": float(rep.depth_cm), "count": int(count)})
+        self._send("rep", {"valid": bool(rep.valid), "depth": float(rep.depth_cm), "count": int(count),
+                           "reason": rep.reason})
 
     def take_reset(self) -> bool:
         """True once after the Reset button on the page was pressed."""

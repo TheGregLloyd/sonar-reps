@@ -76,6 +76,11 @@ def add(a):
         "tones_hz": [float(f) for f in a.tones.split(",")],
         "note": a.note,
     }
+    # What the push-ups in it were, for the rep judge (see judge.py).
+    if a.label:
+        label["label"] = a.label
+    if a.sequence:
+        label["sequence"] = a.sequence
     rc = run_take(label)
     label["expect_valid"] = int(rc.count)
     label["expect_shallow"] = int(sum(not r.valid for r in rc.reps))
@@ -97,6 +102,9 @@ if __name__ == "__main__":
     p.add_argument("--min-depth", type=float, default=RepCounterConfig().min_depth_cm)
     p.add_argument("--tones", default="18500,19100,19700")
     p.add_argument("--note", default="")
+    p.add_argument("--label", choices=["full", "half", "none"], default="",
+                   help="what every push-up in the take was, for the rep judge")
+    p.add_argument("--sequence", default="", help="mixed set, in order: F full, H half, for example FHFHF")
     a = ap.parse_args()
     if a.cmd == "add":
         add(a)

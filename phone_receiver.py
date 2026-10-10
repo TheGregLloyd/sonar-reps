@@ -1,8 +1,10 @@
 """Receive the iPhone's sonar stream on the Mac and count reps live.
 
-  python phone_receiver.py [--port 5005] [--min-depth 15] [--record take.wav] [--display]
+  python phone_receiver.py [--port 5005] [--min-depth 15] [--record take.wav] [--display] [--judge]
 
 --display also serves the live demo screen on http://localhost:8765.
+--judge lets the trained rep judge (judge.json, from judge.py) decide what
+counts, in place of the fixed depth line.
 
 The verdict goes back to the phone as well, so the app can show it: about 30
 times a second one JSON datagram is sent to the address the audio comes from.
@@ -30,6 +32,7 @@ import time
 
 import numpy as np
 
+from judge import REASONS, Judge, MovementFinder
 from live_display import Display
 from sonar_core import RepCounter, RepCounterConfig, SonarConfig, SonarTracker
 
@@ -42,15 +45,28 @@ def main():
     ap.add_argument("--record", default="")
     ap.add_argument("--display", type=int, nargs="?", const=8765, default=0, metavar="PORT",
                     help="serve the live demo screen (default port 8765)")
+    ap.add_argument("--judge", action="store_true", help="count what the trained rep judge calls a full rep")
     a = ap.parse_args()
 
     cfg = SonarConfig(tones_hz=tuple(float(f) for f in a.tones.split(",")))
     tracker = SonarTracker(cfg)
     rep_cfg = RepCounterConfig(min_depth_cm=a.min_depth)
-    counter = RepCounter(tracker.rate_hz, rep_cfg)
+    judge = Judge.load() if a.judge else None
+    if a.judge and judge is None:
+        sys.exit("No judge.json yet. Run: python judge.py")
+    line_cm = 0.0 if judge else a.min_depth  # no fixed line when the judge decides
+
+    def fresh():
+        """A count starting from zero, with the movement finder around it when the judge is on."""
+        if judge:
+            f = MovementFinder(tracker.rate_hz)
+            return f, f.counter
+        return None, RepCounter(tracker.rate_hz, rep_cfg)
+
+    finder, counter = fresh()
     display = None
     if a.display:
-        display = Display(a.min_depth, "iPhone", port=a.display)
+        display = Display(line_cm, "iPhone", port=a.display)
         display.start()
     writer = None
     if a.record:
@@ -73,7 +89,7 @@ def main():
             if len(pkt) == 8:
                 if flags & 2:
                     # The Reset button in the app: same set of tones, count from zero.
-                    counter = RepCounter(tracker.rate_hz, rep_cfg)
+                    finder, counter = fresh()
                     set_no += 1
                     if display:
                         display.reset_requested = True
@@ -94,7 +110,7 @@ def main():
                 else:
                     # The phone restarted its stream: a new set, from zero.
                     tracker = SonarTracker(cfg)
-                    counter = RepCounter(tracker.rate_hz, rep_cfg)
+                    finder, counter = fresh()
                     set_no += 1
                     if display:
                         display.reset_requested = True
@@ -103,7 +119,7 @@ def main():
                 writer.write(x.astype(np.float32))
             pos = tracker.process(x)
             if display and display.take_reset():
-                counter = RepCounter(tracker.rate_hz, rep_cfg)
+                finder, counter = fresh()
                 set_no += 1
             phone_moving = bool(flags & 1)
             if phone_moving:
@@ -113,8 +129,16 @@ def main():
                 counter.state = "up"
                 counter.y = None
             else:
-                for r in counter.process(pos):
-                    mark = "REP" if r.valid else "NO REP (too shallow)"
+                if finder:
+                    done = []
+                    for r, feat in finder.process(pos, tracker.power, tracker.steadiness):
+                        said = judge.verdict(feat)
+                        r.valid, r.reason = said == "full", REASONS[said]
+                        done.append(r)
+                else:
+                    done = counter.process(pos)
+                for r in done:
+                    mark = "REP" if r.valid else f"NO REP ({r.reason})"
                     print(f"\n  {mark}  depth {r.depth_cm:.1f} cm   total {counter.count}")
                     if display:
                         display.rep(r, counter.count)
@@ -128,7 +152,7 @@ def main():
                 reply = {
                     "v": 1, "set": set_no, "depth": round(float(depth), 2), "count": int(counter.count),
                     "shallow": int(sum(not r.valid for r in counter.reps)), "moving": phone_moving,
-                    "lost": int(lost), "min_depth": float(a.min_depth),
+                    "lost": int(lost), "min_depth": float(line_cm),
                     "rep": None if last is None else {"n": len(counter.reps), "valid": bool(last.valid),
                                                       "depth": float(last.depth_cm), "reason": last.reason},
                 }
@@ -146,7 +170,7 @@ def main():
         pass
     if writer:
         writer.close()
-    print(f"\nFinal: {counter.count} valid, {sum(not r.valid for r in counter.reps)} too shallow, "
+    print(f"\nFinal: {counter.count} valid, {sum(not r.valid for r in counter.reps)} refused, "
           f"{lost} packets lost, {blocked} blocks ignored while the phone moved")
 
 

@@ -101,6 +101,12 @@ class SonarTracker:
         n_avg = max(1, int(round(cfg.average_ms * 1e-3 * self.rate_hz)))
         self.avg = np.ones(n_avg) / n_avg
         self.za = np.zeros(n_avg - 1, dtype=complex)
+        self.zp = np.zeros(n_avg - 1)
+        # Side information for the last block, one value per returned sample:
+        # power of the moving part of the echo, and how steadily its phase
+        # turns (near 1 for one clean reflector, near 0 for noise).
+        self.power = np.zeros(0)
+        self.steadiness = np.zeros(0)
         # Phase to reflector movement. The tones are within 3 % of each other,
         # so one wavelength serves for the sum.
         self.scale = SPEED_OF_SOUND / float(np.mean(cfg.tones_hz)) / (4.0 * np.pi)
@@ -122,6 +128,8 @@ class SonarTracker:
         self.prev = d[:, -1].copy()
         p = (d * np.conj(before)).sum(axis=0)
         p, self.za = lfilter(self.avg, 1.0, p, zi=self.za)
+        self.power, self.zp = lfilter(self.avg, 1.0, (np.abs(d) ** 2).sum(axis=0), zi=self.zp)
+        self.steadiness = np.abs(p) / np.maximum(self.power, 1e-30)
         pos = self.position_m + np.cumsum(np.angle(p) * self.scale)
         self.position_m = pos[-1]
         return pos

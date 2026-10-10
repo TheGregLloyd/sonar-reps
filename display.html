@@ -186,6 +186,7 @@ function layout() {
     html += `<div class="tick" style="top:${S.y(cm)}px">${cm % 10 === 0 ? `<span>${cm}</span>` : ""}</div>`;
   $("ticks").innerHTML = html;
   $("repline").style.top = S.y(S.min) + "px";
+  $("repline").style.display = S.min > 0 ? "" : "none";  // no fixed line when the rep judge decides
   $("replabel").textContent = `REP LINE ${S.min.toFixed(0)} CM`;
   const c = $("trace"), r = window.devicePixelRatio || 1;
   c.width = c.clientWidth * r; c.height = c.clientHeight * r;
@@ -212,7 +213,7 @@ function onRep(r) {
     S.count = r.count; $("count").textContent = r.count;
     retrigger($("count"), "thump"); retrigger($("column"), "hit");
   } else {
-    $("why").textContent = `too shallow: ${r.depth.toFixed(1)} cm of ${S.min.toFixed(0)}`;
+    $("why").textContent = `${r.reason || "too shallow"}: ${r.depth.toFixed(1)} cm` + (S.min > 0 ? ` of ${S.min.toFixed(0)}` : "");
     retrigger($("norep"), "go");
   }
 }
@@ -227,8 +228,10 @@ function drawTrace(now) {
   const x = t => w - (now - t) / (WINDOW_S * 1000) * w;
   const y = cm => h * 0.16 + Math.min(cm, MAX_CM) / MAX_CM * h * 0.78;
   g.clearRect(0, 0, w, h);
-  g.setLineDash([8 * r, 8 * r]); g.strokeStyle = "rgba(255,182,39,0.7)"; g.lineWidth = 1.5 * r;
-  g.beginPath(); g.moveTo(0, y(S.min)); g.lineTo(w, y(S.min)); g.stroke(); g.setLineDash([]);
+  if (S.min > 0) {
+    g.setLineDash([8 * r, 8 * r]); g.strokeStyle = "rgba(255,182,39,0.7)"; g.lineWidth = 1.5 * r;
+    g.beginPath(); g.moveTo(0, y(S.min)); g.lineTo(w, y(S.min)); g.stroke(); g.setLineDash([]);
+  }
   if (hist.length > 1) {
     g.beginPath();
     hist.forEach((p, i) => i ? g.lineTo(x(p.t), y(p.d)) : g.moveTo(x(p.t), y(p.d)));
@@ -257,7 +260,7 @@ function frame(now) {
   const d = Math.max(0, S.shown);
   $("chest").style.transform = `translateY(${S.y(d)}px)`;
   $("depth").textContent = d.toFixed(1);
-  $("column").classList.toggle("deep", d >= S.min);
+  $("column").classList.toggle("deep", S.min > 0 && d >= S.min);
   // Hold a mark at the lowest point of the current rep.
   if (d < 1.5) S.peak = 0; else S.peak = Math.max(S.peak, d);
   $("peak").style.top = S.y(S.peak) + "px";

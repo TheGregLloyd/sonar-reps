@@ -1,6 +1,6 @@
 # Sonar Reps
 
-Your phone already has a sonar. Sonar Reps plays near-ultrasonic tones (18.5 to 19.7 kHz) from the iPhone speaker and listens for the echo off your chest. The phase of that echo tracks your movement to the millimetre, so the phone counts push-ups and measures their depth with no camera, no wearable and no special hardware. Built at the QMUL AI Hackathon (Invisible AI), October 2026.
+Your phone already has a sonar. Sonar Reps plays near-ultrasonic tones (18.5 to 19.7 kHz) from the iPhone speaker and listens for the echo off your chest. The phase of that echo follows your chest as it moves, so the phone counts push-ups and reads their depth with no camera, no wearable and no special hardware. Built at the QMUL AI Hackathon (Invisible AI), October 2026.
 
 ## Why sonar
 
@@ -38,15 +38,19 @@ python probe_live.py                     # live tracking on the laptop
 python phone_receiver.py                 # live tracking from the iPhone
 python analyze_wav.py take.wav --plot take.png
 python takes.py                          # replay the real recordings in takes/
+python judge.py                          # train and test the rep judge on the labelled takes
 ```
 
-iPhone: add `ios/SonarEngine.swift` and `ios/SonarView.swift` to an app target, add `NSMicrophoneUsageDescription` and `NSLocalNetworkUsageDescription` to Info.plist, run, type the Mac's IP and press Start. If the university Wi-Fi blocks the stream, turn on the iPhone's Personal Hotspot and join it from the Mac.
+iPhone: `cd ios && xcodegen generate`, open the project, run on a phone, type the Mac's IP and press Start. The Mac sends its verdict back and the phone shows the count. If the university Wi-Fi blocks the stream, turn on the iPhone's Personal Hotspot and join it from the Mac.
 
 ## Status
 
 - Synthetic tests pass: steady, fast (0.7 s) and noisy sets, a shallow rep flagged as no rep, an empty floor counting zero.
 - Laptop test on real hardware: all 10 passes of a book over a MacBook Air were detected. See `RESULTS.md`.
-- Not yet tested on an iPhone. Depth reads about 10% low on synthetic data.
+- iPhone 16 Pro Max, phone face-up on the floor: a confirmed set of 10 push-ups counted 10 of 10, live to the laptop screen. See `RESULTS.md`.
+- Depth is good to a few centimetres, not millimetres, and its scale still varies from set to set. Half reps, kneeling and cheat sets are not yet recorded on the phone.
+- The rep judge (`judge.py`), a small trained model that labels each movement full rep, half rep or not a push-up, is written but not yet trained: it needs those labelled sets.
+- Today the phone is the speaker and microphone and the laptop does the processing over a local hotspot.
 
 ## Prior work
 

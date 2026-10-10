@@ -42,7 +42,8 @@
     ],
     "note": "iPhone 16 Pro Max face-up on the floor, plugged in, tone level 0.3, carriers at 0.003. 10 reps confirmed by Addy. The one NO REP is him getting into position at 1.4 s.",
     "expect_valid": 10,
-    "expect_shallow": 1
+    "expect_shallow": 1,
+    "label": "full"
   },
   {
     "name": "phone_live_4",
