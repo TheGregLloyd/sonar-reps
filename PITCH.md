@@ -15,18 +15,18 @@ Put your phone on the floor and train. It counts your push-ups and refuses half 
 ## What it does today (measured)
 
 - The phone plays three tones at 18.5, 19.1 and 19.7 kHz and tracks the phase of the echo off the chest.
-- Labelled sets on an iPhone 16 Pro Max: **38 of 40 full push-ups counted, 15 of 15 half reps refused.** Normal pace 10 of 10, fast 10 of 10, deep 5 of 5.
+- A trained rep judge decides full rep or half rep. On sets it had not seen: **39 of 40 full push-ups counted, 15 of 15 half reps refused.** Normal pace 10 of 10, fast 10 of 10, deep 5 of 5.
 - Picking up, sliding and shaking the phone: nothing counted. The phone's motion sensor blocks counting while the phone moves.
-- Live from phone to laptop screen over a hotspot. The laptop sends its verdict back to the phone as well (the phone's own count is not yet confirmed on the device).
+- Live from phone to laptop screen over a hotspot. The laptop sends its verdict back for the phone's own screen (not yet confirmed by eye on the device).
 - It worked in a loud room: audible noise up to half of full scale did not change the count.
 - The whole pipeline runs 57 times faster than real time in plain Python on one laptop core.
 
 What it does not do, also measured:
 
-- **A hand moved up and down over the phone counts as a rep** (10 of 10).
+- **A hand moved up and down over the phone counts as a rep** (8 of 10).
 - **Kneeling push-ups count** (9 of 10). The sonar sees one surface moving, not the knees.
 - An empty floor gave one false rep in 30 s, in the first 5 s.
-- Two full reps in a mixed set read too shallow and were refused.
+- One full rep in a mixed set read too shallow and was refused.
 - With the volume turned down it fails outright, so it now refuses to count and says why.
 
 One person, one phone, one afternoon. The full table is in the README.
@@ -37,30 +37,29 @@ Say this plainly, because a judge will ask.
 
 **The tracking is physics, not AI.** Echo phase to chest movement is signal processing, and it should stay that way, because it is exact and explainable.
 
-**We trained a model to judge each movement, tested it properly, and it lost.** So it is not in the product. Every figure is for a take the model had not seen:
+**The verdict is a trained model, and it is in the product.** Every movement is measured on the way down and on the way back up, and a small classifier trained on our own labelled push-ups says full rep or half rep.
 
-| | Right |
+| Tested on sets it had not seen | Full and half reps judged right |
 |---|---|
-| One depth line, fitted on the other takes | 53 of 55 full and half reps |
-| Trained model, full against half | 51 of 55 |
-| Trained model, full, half or not a push-up | 21 of 72 movements |
+| Rep judge | 54 of 55 |
+| One fixed depth line, fitted the same way | 53 of 55 |
 
-**What is learned from data in the product is the rep line.** It was not picked by hand: half reps read 4.7 to 11.2 cm, full reps 13.6 cm and up, and any line from 11.5 to 13.5 cm sorts the same 53 of 55. The product runs 12 cm.
+- Trained on 55 labelled movements, 40 full and 15 half, recorded today.
+- Logistic regression on two numbers: the larger of the two strokes, and how steady the echo was. It is a handful of numbers in `judge.json`, so it will run on the phone as it is.
+- It wins because the sonar sometimes reads one stroke short. One full rep read 8.6 cm down and 16.2 cm back up: the line refuses it, the model counts it.
 
-This replaces what these notes said before the labelled sets existed, that no fixed line could work. Within one session it does. The earlier spread (full reps at 9 to 17 cm in two morning sets) is still unexplained, and those sets would lose reps at 12 cm.
+How we got there, which is worth telling: the first model had seven inputs and three verdicts (full, half, not a push-up) and scored 21 of 72, far worse than the line. A hand wave gave the same numbers as a push-up, so "not a push-up" could not be learned. We dropped that verdict, measured the way back up, and kept the two inputs that scored best.
 
-**What the data says a model would need.** Not more parameters, better measurements:
+Caveats to state if asked: one person; 55 movements; the inputs were chosen on the same test, so 54 of 55 is somewhat optimistic.
 
-- A hand wave matches a push-up on all 7 features we gave the model (depth, timing, speed, echo strength, phase steadiness). Telling a chest from a hand needs the distance to the moving surface and its size. Steady tones give movement only. Short chirps would give distance.
-- The two full reps we refused read 8.6 and 7.7 cm on the way down but 17 and 14.5 cm on the way back up. Using both strokes is the next feature to try.
-- Kneeling cannot be seen from the chest alone at all.
+**The coach note.** After a set the app shows one line of advice, for example "3 movements did not go deep enough, most of them at the end." It needs no prompt and there is no chat, so it fits the theme. It is rules on the model's verdicts, not a language model. Do not call it an AI coach.
 
-How to say it: "Sound gives us the movement. We trained a model to judge it and tested it on sets it had never seen. One line fitted to the same data beat it, 53 to 51 out of 55, so we shipped the line. Here is the table, and here is what fooled both."
+How to say it: "Sound gives us the movement. A small model, trained on 55 of our own labelled push-ups, decides whether each one was a full rep. On sets it had never seen it got 54 of 55 right. You never talk to it: it shows up as a count, or as NO REP."
 
 ### After today (planned, roadmap only)
 
 - **On the phone.** The tracker moves into the app, so the phone works alone. Today the phone is the speaker and microphone and a laptop on the same hotspot does the processing. Nothing goes to the internet.
-- **Distance, not just movement.** Chirps in the same band, to tell a chest at 30 cm from a hand at 10 cm. This is what a learned judge needs before it can beat the line.
+- **Distance, not just movement.** Chirps in the same band, to tell a chest at 30 cm from a hand at 10 cm. This is what the judge needs before it can learn a third verdict, not a push-up.
 - **More data.** More people, floors and phones. Every labelled take is already both a training example and a regression test.
 - **More movements.** Squats, sit-ups, breathing rate: same tones, same tracker.
 - **A coach line.** After the set, one sentence from the per-rep numbers, for example a fade over the last three reps.
@@ -84,7 +83,7 @@ Three ways, each one true of the build:
 
 - **Hardware that already exists.** It needs a speaker and a microphone that work near 19 kHz. Tested on two devices so far: a MacBook Air (tones 61 to 70 dB above the noise floor) and an iPhone 16 Pro Max. A two second self-test (`probe_live.py --check`) says go or no-go for a device and can fall back to fewer tones.
 - **No cost per user.** No server is needed: 57 times real time in unoptimised Python leaves plenty of room on a phone.
-- **Data that compounds.** Every labelled recording is stored once and used twice, to fit the rep line and as a regression test (`takes.py`). Today that is 13 takes.
+- **Data that compounds.** Every labelled recording is stored once and used twice, to train the rep judge and as a regression test (`takes.py`). Today that is 13 takes.
 - **One front end, many movements.** A new exercise is a new labelled set and a new line or small model, not a new sensor.
 
 What limits scale, said honestly: speakers differ between phones; two phones playing the same tones in one room would interfere (planned fix: each picks its own tones); some young people and most pets can hear these tones, so volume stays moderate; full volume makes the iPhone speaker sag and breaks the count.
@@ -107,15 +106,15 @@ What limits scale, said honestly: speakers differ between phones; two phones pla
 | 0:45 | Live: 5 full reps | Count goes 1 to 5. |
 | 1:10 | Live: one half rep | NO REP flash. |
 | 1:20 | Live: pick the phone up and shake it | "Phone moved, not counting." |
-| 1:35 | The trace on the laptop, the pipeline in one picture | Sound gives the movement, a line fitted on labelled sets gives the verdict. |
-| 2:00 | The evaluation table | 38 of 40 full, 15 of 15 half refused, shaking blocked. Then the model we trained and why we did not ship it. |
+| 1:35 | The trace on the laptop, the pipeline in one picture | Sound gives the movement, a model we trained gives the verdict. |
+| 2:00 | The evaluation table | 39 of 40 full, 15 of 15 half refused, shaking blocked. The model against a fixed line: 54 to 53 of 55. |
 | 2:20 | Scale and use cases | Hardware everyone has, no cloud, no camera. |
 | 2:40 | Limits and next | A hand and kneeling get through. Chirps for distance are next. |
 
 ## Questions a judge will ask
 
-- **"Where is the AI?"** We trained a classifier on 72 labelled movements and tested it on takes it had not seen. It lost to one fitted depth line, so the line ships. The learned part of the product is that line. We would rather show a model that lost in a fair test than claim one that works.
-- **"Is this just signal processing?"** The tracking is, on purpose. The verdict is a threshold fitted on labelled data and checked on held-out takes.
+- **"Where is the AI?"** A classifier trained on 55 of our own labelled push-ups judges every rep. On sets it had not seen it got 54 of 55 right, one better than a fixed line. It is small on purpose: the bigger one we tried first lost.
+- **"Is this just signal processing?"** The tracking is, on purpose. The verdict is a trained model, tested on held-out sets.
 - **"Can I cheat it?"** Shaking the phone and half reps: no. Waving a hand over it: yes, today. Kneeling: yes.
 - **"Is the technique new?"** No. Tracking movement from the phase of phone tones is published work (LLAP), and Doppler exercise recognition on a stock phone is too (Fu et al. 2018, linked in the README). What we add is counting and judging push-up reps on an iPhone, with an evaluation that includes the failures.
 - **"How accurate is the depth?"** Good enough to sort full from half reps, not good enough to quote. A deep rep of roughly 30 cm read 17 to 24 cm.

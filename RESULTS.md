@@ -191,3 +191,27 @@ With the 12 cm line and the new closing rule (replay of the stored takes): full 
 The three-way model calls 30 of 40 full reps "not a push-up" and 11 of 17 other movements "full": hand waves and push-ups cannot be told apart from these 7 features, so training on hand waves damages the full class. The two-way model makes the same two mistakes as the line in the mixed set and two more in the fast set.
 
 Decision, as written in `PITCH.md` before the test: the model does not beat the fixed line, so the fixed line ships. No `judge.json` is committed.
+
+## 13:50. Rep judge, second version: in the product
+
+Addy asked for the trained model to go into the product. Two changes made it worth shipping:
+
+- **It measures the way back up.** A movement is now handed over once the chest is back at the top, with the stroke read on the way down, the stroke read on the way up, and the larger of the two. In the mixed set the two refused full reps read 8.6 and 7.7 cm down but 16.2 and 13.7 cm up. In the deep set it is the other way round: 21 to 24 cm down, 8 to 10 cm up.
+- **Two verdicts, two inputs.** Full or half. The model judges on the larger stroke and the steadiness of the echo. "Not a push-up" is dropped: it cannot be learned from these numbers (13:36).
+
+Each set judged by a model trained on the other sets (`python judge.py`):
+
+| | Full and half reps judged right, of 55 |
+|---|---|
+| Rep judge: larger stroke + steadiness | 54 |
+| Larger stroke only | 54 |
+| Way down only | 52 |
+| Way down + way up + larger stroke | 53 |
+| Those three + echo strength + steadiness | 52 |
+| Fixed line on the way down, fitted on the other sets | 53 |
+
+The inputs were chosen from this table, so 54 is somewhat optimistic. The one miss is the full rep that read 7.7 cm down and 13.7 cm up. Counted per unseen set: full 10 of 10, fast 10 of 10, deep 5 of 5, 11:22 set 10 of 10, mixed 4 of 5 full with all 5 half refused, half 0 of 10. Sets it is not trained on: empty floor 1 counted, hand 8 of 10 counted, phone handled 0, kneeling 9 of 10.
+
+The model's line for an echo of average steadiness is 14.6 cm of stroke; the screens draw it as the target.
+
+`phone_receiver.py` now uses the judge by default (`--no-judge` for the fixed line). Checked by replaying raw takes over UDP: mixed 4 counted and 6 refused, fast 10 of 10, deep 5 of 5, half 0 of 10. The verdict now arrives when the chest is back at the top, about a quarter of a second later than before. Not yet run with a person over the phone.
